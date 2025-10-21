@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>제작 요청 완료</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 40px; max-width: 600px; margin: auto; text-align: center; background-color: #f4f7f6; }
+        .container { background: #ffffff; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+        h1 { color: #28a745; margin-bottom: 20px; }
+        p { color: #555; line-height: 1.6; }
+        .summary { margin-top: 20px; padding: 15px; border: 1px dashed #ccc; background-color: #e9ecef; border-radius: 5px; }
+        .home-link { display: inline-block; margin-top: 30px; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; transition: background-color 0.3s; }
+        .home-link:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>✅ 영상 제작 요청 접수 완료!</h1>
+        
+        <p>
+            파일 업로드가 성공적으로 처리되었습니다. <br>
+            요청하신 어학 영상은 백그라운드에서 제작 중입니다.
+        </p>
+
+        <div class="summary">
+            <h3>처리 내용 요약</h3>
+            <p>
+                총 <strong>{{ total_phrases }}</strong>개의 문장 쌍에 대해 <br>
+                <strong>{{ total_clips }}</strong>개의 오디오 클립 및 영상 생성을 시작했습니다.
+            </p>
+        </div>
+
+        <p>
+            영상이 완성되면 등록하신 이메일 또는 알림을 통해 <br>
+            다운로드 링크를 보내드리겠습니다.
+        </p>
+        
+        <a href="{% url 'upload' %}" class="home-link">다른 파일 업로드하기</a>
+    </div>
+</body>
+</html>

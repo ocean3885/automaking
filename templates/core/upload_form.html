@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>어학 영상 자동 생성 서비스</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+        h1 { color: #333; }
+        form { background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
+        input[type="file"] { margin-bottom: 20px; }
+        button { 
+            background-color: #007bff; 
+            color: white; 
+            padding: 10px 15px; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer;
+        }
+        button:hover { background-color: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>📚 어학 문장 영상 제작</h1>
+    <p>암기하고 싶은 문장이 정리된 TXT 파일을 첨부하고 실행 버튼을 눌러주세요.</p>
+    
+    <form method="post" action="{% url 'process' %}" enctype="multipart/form-data">
+        
+        {% csrf_token %} 
+        
+        <label for="file_upload">1. TXT 파일 선택:</label><br>
+        <input type="file" id="file_upload" name="input_file" accept=".txt" required><br>
+        
+        <p><strong>파일 형식 예시:</strong></p>
+        <pre>
+Yo quiero un café.
+나는 커피 한 잔을 원해.
+
+Tú quieres ir al cine.
+너는 영화 보러 가고 싶어 해.
+        </pre>
+        
+        <button type="submit">🎬 실행 (TTS 변환 및 영상 제작)</button>
+    </form>
+</body>
+</html>

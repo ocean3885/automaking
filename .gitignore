@@ -1,0 +1,9 @@
+# .gitignore
+# Django 관련 파일
+*.sqlite3
+.DS_Store
+__pycache__/
+
+# 환경 설정 및 비밀 파일
+secret.json
+/venv/ 
