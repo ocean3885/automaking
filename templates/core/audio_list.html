@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}내 음성 파일 - AutoMaking{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">내 음성 파일</h1>
+
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <select class="form-select" id="categoryFilter">
+                <option value="">모든 카테고리</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>
+                    {{ category.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-6">
+            <div class="input-group">
+                <input type="text" class="form-control" id="searchInput" placeholder="제목 검색..."
+                       value="{{ search_query }}">
+                <button class="btn btn-outline-secondary" type="button" id="searchBtn">검색</button>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <a href="{% url 'upload' %}" class="btn btn-primary w-100">새 파일 업로드</a>
+        </div>
+    </div>
+
+    <div class="row">
+        {% for audio in audios %}
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">{{ audio.title }}</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">{{ audio.category.name }}</h6>
+                    <p class="card-text">
+                        <small class="text-muted">생성일: {{ audio.created_at|date:"Y-m-d H:i" }}</small>
+                    </p>
+                    <audio controls class="w-100 mb-3">
+                        {% if audio.audio_file %}
+                        <source src="{{ audio.audio_file.url }}" type="audio/mpeg">
+                        {% else %}
+                        <source src="data:audio/mpeg;base64,{{ audio.audio_data }}" type="audio/mpeg">
+                        {% endif %}
+                        브라우저가 오디오를 지원하지 않습니다.
+                    </audio>
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'audio_detail' audio.id %}" class="btn btn-outline-primary">상세보기</a>
+                        <button class="btn btn-outline-danger delete-btn" data-id="{{ audio.id }}">삭제</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                저장된 음성 파일이 없습니다.
+                <a href="{% url 'upload' %}" class="alert-link">새 파일을 업로드</a>해보세요.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if audios.has_other_pages %}
+    <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+            {% if audios.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ audios.previous_page_number }}&category={{ selected_category }}&q={{ search_query }}">&laquo;</a>
+            </li>
+            {% endif %}
+
+            {% for i in audios.paginator.page_range %}
+            <li class="page-item {% if audios.number == i %}active{% endif %}">
+                <a class="page-link" href="?page={{ i }}&category={{ selected_category }}&q={{ search_query }}">{{ i }}</a>
+            </li>
+            {% endfor %}
+
+            {% if audios.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ audios.next_page_number }}&category={{ selected_category }}&q={{ search_query }}">&raquo;</a>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+</div>
+
+<script>
+document.getElementById('categoryFilter').addEventListener('change', function() {
+    updateUrl();
+});
+
+document.getElementById('searchBtn').addEventListener('click', function() {
+    updateUrl();
+});
+
+document.getElementById('searchInput').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        updateUrl();
+    }
+});
+
+function updateUrl() {
+    const category = document.getElementById('categoryFilter').value;
+    const search = document.getElementById('searchInput').value;
+    const params = new URLSearchParams(window.location.search);
+    
+    if (category) params.set('category', category);
+    else params.delete('category');
+    
+    if (search) params.set('q', search);
+    else params.delete('q');
+    
+    params.set('page', '1');
+    
+    window.location.href = `${window.location.pathname}?${params.toString()}`;
+}
+
+// 삭제 버튼 이벤트 처리
+document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        if (confirm('정말 삭제하시겠습니까?')) {
+            const audioId = this.dataset.id;
+            try {
+                const response = await fetch(`/audio/${audioId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                    }
+                });
+                
+                if (response.ok) {
+                    window.location.reload();
+                } else {
+                    alert('삭제에 실패했습니다.');
+                }
+            } catch (error) {
+                alert('오류가 발생했습니다.');
+                console.error(error);
+            }
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block title %}홈 - AutoMaking{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-4">AutoMaking에 오신 것을 환영합니다</h1>
+    <p class="lead">자동화된 음성 생성 서비스</p>
+    
+    {% if user.is_authenticated %}
+        <div class="mt-4">
+            <a href="{% url 'upload' %}" class="btn btn-primary btn-lg">음성 만들기</a>
+            <a href="{% url 'audio_list' %}" class="btn btn-success btn-lg ms-3">내 학습 목록</a>
+        </div>
+    {% else %}
+        <div class="mt-4">
+            <a href="{% url 'account_login' %}" class="btn btn-primary">로그인하여 시작하기</a>
+            <a href="{% url 'account_signup' %}" class="btn btn-outline-primary ms-2">회원가입</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

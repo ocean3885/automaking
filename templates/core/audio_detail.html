@@ -1,0 +1,458 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ audio.title }} - AutoMaking{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="d-flex align-items-center">
+            <span id="titleDisplay" class="me-2" style="cursor: pointer;" title="클릭하여 제목 수정">{{ audio.title }}</span>
+            <button id="editTitleBtn" class="btn btn-sm btn-outline-secondary" style="display: none;">
+                <i class="fas fa-check"></i>
+            </button>
+        </h1>
+        <div>
+            <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary">목록으로</a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-1">
+                        <strong>카테고리:</strong>
+                        <select id="categorySelect" class="form-select form-select-sm d-inline-block w-auto ms-2">
+                            <option value="0">카테고리 없음</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}" {% if audio.category.id == category.id %}selected{% endif %}>
+                                {{ category.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <p class="mb-0"><strong>생성일:</strong> {{ audio.created_at|date:"Y년 m월 d일 H:i" }}</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <button class="btn btn-danger" id="deleteBtn">삭제</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <audio id="audio-player" class="w-100 mb-3">
+                {% if audio.audio_file %}
+                <source src="{{ audio.audio_file.url }}" type="audio/mpeg">
+                {% else %}
+                <source src="data:audio/mpeg;base64,{{ audio.audio_data }}" type="audio/mpeg">
+                {% endif %}
+                브라우저가 오디오를 지원하지 않습니다.
+            </audio>
+            <div class="d-flex justify-content-center align-items-center mb-2">
+                <div class="btn-group me-2">
+                    <button id="playPauseBtn" class="btn btn-primary">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button id="stopBtn" class="btn btn-secondary">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="progress mb-2" style="height: 8px;">
+                <div id="progressBar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+            </div>
+            <div class="d-flex justify-content-between small text-muted mb-2">
+                <span id="currentTime">0:00</span>
+                <span id="duration">0:00</span>
+            </div>
+            <div class="d-flex justify-content-center align-items-center mt-2">
+                <button id="repeatBtn" class="btn btn-outline-primary" disabled>
+                    <i class="fas fa-redo"></i> 현재 문장 반복
+                </button>
+            </div>
+            <!-- 5초 버튼 제거: 좌/우 화살표로 -10s/+10s 이동하여 재생 -->
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h5 class="card-title mb-0">문장 목록</h5>
+        </div>
+        <div class="card-body">
+            <style>
+                .sentence-item { cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: background-color 180ms ease, transform 120ms ease; }
+                .sentence-item:hover { background-color: #f8f9fa; transform: translateY(-2px); }
+                .sentence-item .original { color: #333; font-weight: normal; }
+                .sentence-item.active { background-color: #fff5f5; }
+                .sentence-item.active .original { color: #c00; font-weight: 700; }
+                .sentence-item .translation { color: #666; }
+                /* 반복 재생 활성화 시 버튼 스타일 */
+                #repeatBtn.active {
+                    background-color: #007bff;
+                    color: white;
+                }
+                /* 모바일에서 터치하기 쉽도록 클릭 영역 확장 */
+                @media (max-width: 767px) {
+                    .sentence-item { padding: 1rem; }
+                }
+            </style>
+            {% for s in sentences_with_times %}
+            <div class="border-bottom py-3 {% if not forloop.last %}mb-3{% endif %} sentence-item" data-start="{{ s.start }}" data-end="{{ s.end }}" data-index="{{ forloop.counter0 }}">
+                <p class="h5 mb-2 original">{{ s.text }}</p>
+                <p class="text-muted mb-0 translation">{{ s.translation }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Font Awesome CDN 추가 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<script>
+// 제목 편집 기능
+const titleDisplay = document.getElementById('titleDisplay');
+const editTitleBtn = document.getElementById('editTitleBtn');
+let isEditingTitle = false;
+let originalTitle = titleDisplay.textContent;
+
+titleDisplay.addEventListener('click', () => {
+    if (!isEditingTitle) {
+        isEditingTitle = true;
+        originalTitle = titleDisplay.textContent;
+        titleDisplay.contentEditable = true;
+        titleDisplay.focus();
+        editTitleBtn.style.display = 'inline-block';
+        
+        // 전체 텍스트 선택
+        const range = document.createRange();
+        range.selectNodeContents(titleDisplay);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+});
+
+// Enter 키로 저장, Esc 키로 취소
+titleDisplay.addEventListener('keydown', async (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        await saveTitle();
+    } else if (e.key === 'Escape') {
+        cancelTitleEdit();
+    }
+});
+
+editTitleBtn.addEventListener('click', saveTitle);
+
+async function saveTitle() {
+    if (!isEditingTitle) return;
+    
+    const newTitle = titleDisplay.textContent.trim();
+    if (!newTitle) {
+        alert('제목은 비워둘 수 없습니다.');
+        titleDisplay.textContent = originalTitle;
+        return;
+    }
+
+    try {
+        const response = await fetch('{% url "update_audio" audio.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ title: newTitle })
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            titleDisplay.textContent = data.title;
+            endTitleEdit();
+        } else {
+            alert(data.error || '제목 수정에 실패했습니다.');
+            titleDisplay.textContent = originalTitle;
+            endTitleEdit();
+        }
+    } catch (error) {
+        alert('오류가 발생했습니다.');
+        console.error(error);
+        titleDisplay.textContent = originalTitle;
+        endTitleEdit();
+    }
+}
+
+function cancelTitleEdit() {
+    titleDisplay.textContent = originalTitle;
+    endTitleEdit();
+}
+
+function endTitleEdit() {
+    isEditingTitle = false;
+    titleDisplay.contentEditable = false;
+    editTitleBtn.style.display = 'none';
+}
+
+// 카테고리 변경 처리
+const categorySelect = document.getElementById('categorySelect');
+categorySelect.addEventListener('change', async () => {
+    try {
+        const response = await fetch('{% url "update_audio" audio.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ category_id: categorySelect.value })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            alert(data.error || '카테고리 변경에 실패했습니다.');
+            // 실패하면 이전 선택으로 되돌림
+            categorySelect.value = data.category?.id || "0";
+        }
+    } catch (error) {
+        alert('오류가 발생했습니다.');
+        console.error(error);
+    }
+});
+
+// 삭제 버튼
+document.getElementById('deleteBtn').addEventListener('click', async function() {
+    if (confirm('정말 삭제하시겠습니까?')) {
+        try {
+            const response = await fetch('{% url "delete_audio" audio.id %}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            });
+            
+            if (response.ok) {
+                window.location.href = '{% url "audio_list" %}';
+            } else {
+                alert('삭제에 실패했습니다.');
+            }
+        } catch (error) {
+            alert('오류가 발생했습니다.');
+            console.error(error);
+        }
+    }
+});
+
+const audio = document.getElementById('audio-player');
+const repeatBtn = document.getElementById('repeatBtn');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const stopBtn = document.getElementById('stopBtn');
+const progressBar = document.getElementById('progressBar');
+const currentTimeEl = document.getElementById('currentTime');
+const durationEl = document.getElementById('duration');
+
+let isRepeating = false;
+let currentRepeatStart = 0;
+let currentRepeatEnd = 0;
+
+// 시간을 mm:ss 형식으로 포맷팅
+function formatTime(seconds) {
+    seconds = Math.floor(seconds);
+    const minutes = Math.floor(seconds / 60);
+    seconds = seconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+// 재생/일시정지 버튼 클릭
+playPauseBtn.addEventListener('click', () => {
+    if (audio.paused) {
+        audio.play();
+    } else {
+        audio.pause();
+    }
+});
+
+// 정지 버튼 클릭
+stopBtn.addEventListener('click', () => {
+    audio.pause();
+    audio.currentTime = 0;
+    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+});
+
+// 재생 상태 변경 시 버튼 아이콘 업데이트
+audio.addEventListener('play', () => {
+    playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+});
+
+audio.addEventListener('pause', () => {
+    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+});
+
+// 재생 시간 및 프로그레스 바 업데이트
+audio.addEventListener('loadedmetadata', () => {
+    durationEl.textContent = formatTime(audio.duration);
+});
+
+audio.addEventListener('timeupdate', () => {
+    const percent = (audio.currentTime / audio.duration) * 100;
+    progressBar.style.width = `${percent}%`;
+    currentTimeEl.textContent = formatTime(audio.currentTime);
+});
+
+// 반복 재생 버튼 클릭 이벤트
+repeatBtn.addEventListener('click', () => {
+    isRepeating = !isRepeating;
+    repeatBtn.classList.toggle('active');
+    
+    if (isRepeating) {
+        // 현재 재생 중인 문장의 시작/종료 시간 저장
+        const activeItem = document.querySelector('.sentence-item.active');
+        if (activeItem) {
+            currentRepeatStart = parseFloat(activeItem.getAttribute('data-start')) || 0;
+            currentRepeatEnd = parseFloat(activeItem.getAttribute('data-end')) || 0;
+        } else {
+            // 활성 문장이 없으면 반복 재생 비활성화
+            isRepeating = false;
+            repeatBtn.classList.remove('active');
+        }
+    }
+});
+
+// 오디오 timeupdate 이벤트에서 반복 재생 처리
+audio.addEventListener('timeupdate', () => {
+    const currentTime = audio.currentTime;
+    
+    // 반복 재생 중이고 현재 시간이 종료 시간을 넘어가면
+    if (isRepeating && currentTime >= currentRepeatEnd) {
+        // 시작 시간으로 되돌아가서 재생
+        audio.currentTime = currentRepeatStart;
+    }
+});
+
+// 키보드 좌/우 화살표로 -10초/+10초 이동하고 재생 (더 안정적 처리)
+document.addEventListener('keydown', (e) => {
+    // 입력 중이면 키 조작을 방지
+    const tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
+
+    // 브라우저/환경별로 키 이름이 다를 수 있으니 여러 케이스 지원
+    const isLeft = e.key === 'ArrowLeft' || e.key === 'Left' || e.keyCode === 37;
+    const isRight = e.key === 'ArrowRight' || e.key === 'Right' || e.keyCode === 39;
+    if (!isLeft && !isRight) return;
+
+    // 페이지 스크롤 같은 기본 동작 방지
+    e.preventDefault();
+
+    // 현재 시간이 유효한 숫자인지 확인
+    const cur = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+
+    if (isLeft) {
+        const newTime = Math.max(0, cur - 10);
+        audio.currentTime = newTime;
+        audio.play();
+    } else if (isRight) {
+        let newTime = cur + 10;
+        // duration이 유한한 값이면 범위 안으로 제한
+        if (Number.isFinite(audio.duration)) {
+            newTime = Math.min(audio.duration, newTime);
+        }
+        audio.currentTime = newTime;
+        audio.play();
+    }
+});
+
+// 문장 클릭 시 해당 시간으로 이동하여 재생하고 현재 재생 중인 문장 하이라이트 처리
+const sentenceItems = Array.from(document.querySelectorAll('.sentence-item'));
+sentenceItems.forEach(item => {
+    item.addEventListener('click', () => {
+        const start = parseFloat(item.getAttribute('data-start')) || 0;
+        // 스크롤을 중앙에 부드럽게 위치
+        item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // 페이드 아웃 -> seek -> 재생 -> 페이드 인
+        seekWithFade(start);
+        updateActiveSentenceByTime(start);
+    });
+});
+
+let _fadeInterval = null;
+function fadeVolume(target, duration = 150, cb) {
+    if (_fadeInterval) clearInterval(_fadeInterval);
+    const start = Number.isFinite(audio.volume) ? audio.volume : 1;
+    const diff = target - start;
+    const steps = Math.max(1, Math.floor(duration / 16));
+    let i = 0;
+    const stepTime = duration / steps;
+    _fadeInterval = setInterval(() => {
+        i++;
+        const v = start + diff * (i / steps);
+        audio.volume = Math.max(0, Math.min(1, v));
+        if (i >= steps) {
+            clearInterval(_fadeInterval);
+            _fadeInterval = null;
+            if (cb) cb();
+        }
+    }, stepTime);
+}
+
+function seekWithFade(timeSec) {
+    // 만약 오디오가 아직 메타데이터를 로드하지 않았다면 canplay 이벤트에서 처리
+    const doSeekAndPlay = () => {
+        try {
+            audio.currentTime = timeSec;
+            audio.play().catch(() => {});
+            // 재생 후 볼륨 페이드인
+            fadeVolume(1, 160);
+        } catch (e) {
+            // 일부 브라우저는 currentTime 세팅 시 오류를 던질 수 있음
+            console.warn('seek error', e);
+        }
+    };
+
+    // 빠르게 페이드 아웃 후 seek
+    fadeVolume(0, 120, () => {
+        if (audio.readyState >= 1) {
+            doSeekAndPlay();
+        } else {
+            const onCanPlay = () => {
+                audio.removeEventListener('canplay', onCanPlay);
+                doSeekAndPlay();
+            };
+            audio.addEventListener('canplay', onCanPlay);
+        }
+    });
+}
+
+// 재생 중에 활성 문장을 업데이트하는 함수
+let _currentActiveIndex = -1;
+function updateActiveSentenceByTime(time) {
+    sentenceItems.forEach((item, idx) => {
+        const start = parseFloat(item.getAttribute('data-start')) || 0;
+        const end = parseFloat(item.getAttribute('data-end')) || 0;
+        const isActive = (time >= start && time < end);
+        if (isActive) {
+            if (_currentActiveIndex !== idx) {
+                // 새로 활성화된 문장만 스크롤(부드럽게) 및 포커스
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                _currentActiveIndex = idx;
+            }
+            item.classList.add('active');
+            // 문장이 변경되면 반복 재생 해제
+            if (isRepeating && (_currentActiveIndex !== idx)) {
+                isRepeating = false;
+                repeatBtn.classList.remove('active');
+            }
+        } else {
+            item.classList.remove('active');
+        }
+    });
+}
+
+// 오디오 재생 중 시간 업데이트에 따라 활성 문장 하이라이트
+audio.addEventListener('timeupdate', () => {
+    const t = audio.currentTime;
+    updateActiveSentenceByTime(t);
+    // 재생 중인 문장이 있으면 반복 버튼 활성화
+    repeatBtn.disabled = !document.querySelector('.sentence-item.active');
+});
+</script>
+{% endblock %}

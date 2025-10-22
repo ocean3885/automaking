@@ -1,9 +1,76 @@
-# .gitignore
-# Django 관련 파일
-*.sqlite3
-.DS_Store
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
 
-# 환경 설정 및 비밀 파일
+# Byte-compiled / optimized / DLL files
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+.eggs/
+.eggs-info/
+.installed.cfg
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+.env/
+.venv/
+env/
+venv.bak/
+venv3/
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+pip-log.txt
+
+# SQLite DB
+db.sqlite3
+*.sqlite3
+
+# Coverage
+.coverage
+htmlcov/
+
+# pytest
+.pytest_cache/
+
+# Media files (user uploads)
+/media/
+media/
+
+# Secret files
 secret.json
-/venv/ 
+.env
+
+# Staticfiles
+staticfiles/
+
+# Misc
+*.bak
+*.swp
+
+# Node
+node_modules/
+
+# JetBrains
+out/
+
+# Ignore uploaded audio files folder
+audios/

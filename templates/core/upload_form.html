@@ -1,45 +1,119 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>어학 영상 자동 생성 서비스</title>
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; max-width: 600px; margin: auto; }
-        h1 { color: #333; }
-        form { background: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #ddd; }
-        input[type="file"] { margin-bottom: 20px; }
-        button { 
-            background-color: #007bff; 
-            color: white; 
-            padding: 10px 15px; 
-            border: none; 
-            border-radius: 5px; 
-            cursor: pointer;
-        }
-        button:hover { background-color: #0056b3; }
-    </style>
-</head>
-<body>
-    <h1>📚 어학 문장 영상 제작</h1>
-    <p>암기하고 싶은 문장이 정리된 TXT 파일을 첨부하고 실행 버튼을 눌러주세요.</p>
+{% extends 'base.html' %}
+
+{% block title %}파일 업로드 - AutoMaking{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">📚 어학 문장 영상 제작</h1>
+    <p>암기하고 싶은 문장이 정리된 TXT 파일을 첨부하고 필요한 정보를 입력한 후 실행 버튼을 눌러주세요.</p>
     
-    <form method="post" action="{% url 'process' %}" enctype="multipart/form-data">
+    <form method="post" action="{% url 'process' %}" enctype="multipart/form-data" class="needs-validation" novalidate>
+        {% csrf_token %}
         
-        {% csrf_token %} 
+        <div class="mb-3">
+            <label for="title" class="form-label">제목</label>
+            <input type="text" class="form-control" id="title" name="title" required>
+        </div>
         
-        <label for="file_upload">1. TXT 파일 선택:</label><br>
-        <input type="file" id="file_upload" name="input_file" accept=".txt" required><br>
+        <div class="mb-3">
+            <label for="category" class="form-label">카테고리</label>
+            <select class="form-select" id="category" name="category" required>
+                <option value="">카테고리 선택</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+            </select>
+            <div class="mt-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
+                    새 카테고리 추가
+                </button>
+            </div>
+        </div>
         
-        <p><strong>파일 형식 예시:</strong></p>
-        <pre>
+        <div class="mb-3">
+            <label for="file_upload" class="form-label">TXT 파일 선택</label>
+            <input type="file" class="form-control" id="file_upload" name="input_file" accept=".txt" required>
+        </div>
+        
+        <div class="card mb-3">
+            <div class="card-body">
+                <h6 class="card-title">파일 형식 예시:</h6>
+                <pre class="mb-0">
 Yo quiero un café.
 나는 커피 한 잔을 원해.
 
 Tú quieres ir al cine.
-너는 영화 보러 가고 싶어 해.
-        </pre>
+너는 영화 보러 가고 싶어 해.</pre>
+            </div>
+        </div>
         
-        <button type="submit">🎬 실행 (TTS 변환 및 영상 제작)</button>
+        <button type="submit" class="btn btn-primary">🎬 실행 (TTS 변환 및 저장)</button>
+        <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary">내 음성 파일 목록</a>
     </form>
-</body>
-</html>
+</div>
+
+<!-- 새 카테고리 추가 모달 -->
+<div class="modal fade" id="newCategoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">새 카테고리 추가</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="categoryForm">
+                    <div class="mb-3">
+                        <label for="categoryName" class="form-label">카테고리 이름</label>
+                        <input type="text" class="form-control" id="categoryName" required>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary" id="saveCategoryBtn">저장</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('saveCategoryBtn').addEventListener('click', async function() {
+    const categoryName = document.getElementById('categoryName').value;
+    if (!categoryName) {
+        alert('카테고리 이름을 입력해주세요.');
+        return;
+    }
+
+    try {
+        const response = await fetch('{% url "add_category" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify({ name: categoryName })
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const select = document.getElementById('category');
+            const option = new Option(data.name, data.id);
+            select.add(option);
+            select.value = data.id;
+            
+            // 모달 닫기
+            const modal = bootstrap.Modal.getInstance(document.getElementById('newCategoryModal'));
+            modal.hide();
+            
+            // 입력 필드 초기화
+            document.getElementById('categoryName').value = '';
+        } else {
+            alert('카테고리 추가에 실패했습니다.');
+        }
+    } catch (error) {
+        alert('오류가 발생했습니다.');
+        console.error(error);
+    }
+});
+</script>
+{% endblock %}

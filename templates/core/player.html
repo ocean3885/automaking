@@ -1,20 +1,9 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>오디오 플레이어</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background-color: #f0f2f5;
-        }
+{% extends 'base.html' %}
+
+{% block title %}오디오 플레이어 - AutoMaking{% endblock %}
+
+{% block content %}
+<style>
         .player-container {
             width: 90%;
             max-width: 600px;
@@ -28,29 +17,7 @@
             width: 100%;
         }
         
-        /* 💡 [CSS 추가] 버튼을 담을 컨테이너 */
-        .controls-container {
-            margin: 1rem 0;
-            display: flex;
-            justify-content: center;
-            gap: 1rem;
-        }
-        
-        /* 💡 [CSS 추가] 버튼 스타일 */
-        .controls-container button {
-            background-color: #007bff;
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            font-size: 1rem;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            font-weight: bold;
-        }
-        .controls-container button:hover {
-            background-color: #0056b3;
-        }
+        /* (버튼 제거) 플레이어는 키보드 화살표로 제어합니다. */
 
         #sentence-display {
             min-height: 100px;
@@ -81,10 +48,7 @@
             브라우저가 오디오 요소를 지원하지 않습니다.
         </audio>
 
-        <div class="controls-container">
-            <button id="skip-backward-btn">&laquo; 5초 뒤로</button>
-            <button id="skip-forward-btn">5초 앞으로 &raquo;</button>
-        </div>
+        <!-- 5초 이동 버튼 제거: 왼쪽/오른쪽 화살표 키로 -10s/+10s 이동하여 재생합니다 -->
 
         <div id="sentence-display">
             <p id="original-text">오디오를 재생하세요.</p>
@@ -101,9 +65,33 @@
         const originalTextElem = document.getElementById('original-text');
         const translatedTextElem = document.getElementById('translated-text');
         
-        // 💡 [JS 추가] 5초 이동 버튼 요소 가져오기
-        const skipBackwardBtn = document.getElementById('skip-backward-btn');
-        const skipForwardBtn = document.getElementById('skip-forward-btn');
+
+        // 키보드 좌/우 화살표로 -10초/+10초 이동하고 재생 (더 안정적 처리)
+        document.addEventListener('keydown', (e) => {
+            // 텍스트 입력 필드나 편집 가능한 요소에 포커스가 있으면 키 동작을 방지
+            const tag = e.target && e.target.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
+
+            const isLeft = e.key === 'ArrowLeft' || e.key === 'Left' || e.keyCode === 37;
+            const isRight = e.key === 'ArrowRight' || e.key === 'Right' || e.keyCode === 39;
+            if (!isLeft && !isRight) return;
+
+            e.preventDefault();
+            const cur = Number.isFinite(audioPlayer.currentTime) ? audioPlayer.currentTime : 0;
+
+            if (isLeft) {
+                const newTime = Math.max(0, cur - 10);
+                audioPlayer.currentTime = newTime;
+                audioPlayer.play();
+            } else if (isRight) {
+                let newTime = cur + 10;
+                if (Number.isFinite(audioPlayer.duration)) {
+                    newTime = Math.min(audioPlayer.duration, newTime);
+                }
+                audioPlayer.currentTime = newTime;
+                audioPlayer.play();
+            }
+        });
 
         let currentSentenceIndex = -1; // 현재 활성화된 문장의 인덱스 추적
 
@@ -132,23 +120,6 @@
             currentSentenceIndex = -1;
         });
         
-        // 💡 [JS 추가] 5초 뒤로 가기 버튼 클릭 이벤트
-        skipBackwardBtn.addEventListener('click', () => {
-            // 현재 시간에서 5초를 빼고, 0초 미만으로 내려가지 않도록 설정
-            audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 5);
-        });
-
-        // 💡 [JS 추가] 5초 앞으로 가기 버튼 클릭 이벤트
-        skipForwardBtn.addEventListener('click', () => {
-            // 오디오의 전체 길이(duration)를 알고 있을 때만 최대값 제한
-            if (audioPlayer.duration) {
-                // 현재 시간에서 5초를 더하고, 전체 길이를 넘지 않도록 설정
-                audioPlayer.currentTime = Math.min(audioPlayer.duration, audioPlayer.currentTime + 5);
-            } else {
-                // duration 로드 전이면 일단 5초 더하기
-                audioPlayer.currentTime += 5;
-            }
-        });
+        // 버튼 클릭 이벤트 관련 코드를 제거했습니다. 키보드로 제어하세요.
     </script>
-</body>
-</html>
+{% endblock %}
