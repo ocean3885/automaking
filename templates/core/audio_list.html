@@ -3,6 +3,9 @@
 {% block title %}내 음성 파일 - AutoMaking{% endblock %}
 
 {% block content %}
+<!-- Font Awesome CDN 추가 -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
 <div class="container">
     <h1 class="mb-4">내 음성 파일</h1>
 
@@ -31,24 +34,19 @@
 
     <div class="row">
         {% for audio in audios %}
-        <div class="col-md-6 mb-4">
+                <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">{{ audio.title }}</h5>
-                    <h6 class="card-subtitle mb-2 text-muted">{{ audio.category.name }}</h6>
+                    <h6 class="card-subtitle mb-2 text-muted">{{ audio.category.name|default:"카테고리 없음" }}</h6>
                     <p class="card-text">
                         <small class="text-muted">생성일: {{ audio.created_at|date:"Y-m-d H:i" }}</small>
                     </p>
-                    <audio controls class="w-100 mb-3">
-                        {% if audio.audio_file %}
-                        <source src="{{ audio.audio_file.url }}" type="audio/mpeg">
-                        {% else %}
-                        <source src="data:audio/mpeg;base64,{{ audio.audio_data }}" type="audio/mpeg">
-                        {% endif %}
-                        브라우저가 오디오를 지원하지 않습니다.
-                    </audio>
+                    <p class="card-text">
+                        <i class="fas fa-eye"></i> 조회수: <strong>{{ audio.view_count }}</strong>
+                    </p>
                     <div class="d-flex justify-content-between">
-                        <a href="{% url 'audio_detail' audio.id %}" class="btn btn-outline-primary">상세보기</a>
+                        <a href="{% url 'audio_detail' audio.id %}" class="btn btn-primary">학습하기</a>
                         <button class="btn btn-outline-danger delete-btn" data-id="{{ audio.id }}">삭제</button>
                     </div>
                 </div>

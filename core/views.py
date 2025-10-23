@@ -240,6 +240,10 @@ def audio_list(request):
 @login_required
 def audio_detail(request, audio_id):
     audio = get_object_or_404(AudioContent, id=audio_id, user=request.user)
+    
+    # 조회수 증가
+    audio.view_count += 1
+    audio.save(update_fields=['view_count'])
 
     # original_text, translated_text를 줄 단위로 파싱하여 쌍으로 전달
     orig_lines = [ln.strip() for ln in (audio.original_text or '').splitlines() if ln.strip()]
