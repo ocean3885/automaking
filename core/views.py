@@ -7,6 +7,7 @@ from django.shortcuts import render
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.urls import reverse
 from django.conf import settings
+from automaking.settings.base import get_secret
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.contrib.auth.decorators import login_required
 
@@ -23,11 +24,43 @@ from django.core.files.base import ContentFile
 from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse
-from .models import AudioContent, Category
+from .models import AudioContent, Category, Collection
+
+# Gemini AI 관련
+import google.generativeai as genai
 
 def home(request):
-    """홈 페이지를 표시합니다."""
-    return render(request, 'core/home.html')
+    """홈 페이지를 표시합니다. 카테고리별 최신 게시물을 보여줍니다."""
+    # 게시물이 있는 카테고리만 가져오기
+    categories_with_posts = Category.objects.filter(
+        audio_contents__isnull=False
+    ).distinct().order_by('name')
+    
+    # 각 카테고리별로 최신 게시물 5개씩 가져오기
+    category_posts = []
+    for category in categories_with_posts:
+        posts = AudioContent.objects.filter(category=category).order_by('-created_at')[:5]
+        if posts.exists():
+            category_posts.append({
+                'category': category,
+                'posts': posts
+            })
+    
+    # 카테고리 없는 게시물도 확인
+    uncategorized_posts = AudioContent.objects.filter(category__isnull=True).order_by('-created_at')[:5]
+    if uncategorized_posts.exists():
+        category_posts.append({
+            'category': None,
+            'posts': uncategorized_posts
+        })
+    
+    context = {
+        'category_posts': category_posts,
+        'total_posts': AudioContent.objects.count(),
+        'total_categories': categories_with_posts.count()
+    }
+    
+    return render(request, 'core/home.html', context)
 
 
 
@@ -227,12 +260,19 @@ def audio_list(request):
     if category:
         qs = qs.filter(category_id=category)
 
+    # 사용자의 모든 보관함에 포함된 오디오 ID 목록
+    audio_ids_in_collections = set(
+        Collection.objects.filter(user=request.user)
+        .values_list('audio_contents__id', flat=True)
+    )
+
     categories = Category.objects.all()
     context = {
         'audios': qs,
         'categories': categories,
         'search_query': q or '',
         'selected_category': int(category) if category else None,
+        'audio_ids_in_collections': audio_ids_in_collections,
     }
     return render(request, 'core/audio_list.html', context)
 
@@ -279,18 +319,29 @@ def audio_detail(request, audio_id):
         for o, t in sentences:
             sentences_with_times.append({'text': o, 'translation': t, 'start': 0, 'end': 0})
 
+    # 이 오디오가 사용자의 보관함에 이미 추가되어 있는지 확인
+    is_in_collection = Collection.objects.filter(
+        user=request.user,
+        audio_contents=audio
+    ).exists()
+
     context = {
         'audio': audio,
         'sentences': sentences,
         'sentences_with_times': sentences_with_times,
         'sync_data_json': json.dumps(sentences_with_times),
         'categories': Category.objects.all(),
+        'is_in_collection': is_in_collection,
     }
     return render(request, 'core/audio_detail.html', context)
 
 
 @login_required
 def add_category(request):
+    # staff 권한 확인
+    if not request.user.is_staff:
+        return JsonResponse({'error': '카테고리 생성 권한이 없습니다.'}, status=403)
+    
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
@@ -360,4 +411,380 @@ def update_audio(request, audio_id):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+
+@login_required
+def generate_sentences_view(request):
+    """Gemini AI를 사용하여 학습용 문장을 생성합니다."""
+    if request.method != 'POST':
+        return HttpResponseRedirect(reverse('upload'))
+    
+    # 파라미터 가져오기
+    title = request.POST.get('title', 'AI 생성 문장')
+    category_id = request.POST.get('category')
+    source_language = request.POST.get('source_language')
+    target_word = request.POST.get('target_word')
+    sentence_count = int(request.POST.get('sentence_count', 5))
+    
+    # 언어 이름 매핑
+    language_names = {
+        'es': '스페인어',
+        'en': '영어',
+        'fr': '프랑스어',
+        'de': '독일어',
+        'ja': '일본어',
+        'zh': '중국어'
+    }
+    
+    try:
+        # Gemini API 초기화
+        gemini_api_key = get_secret("GEMINI_API_KEY")
+        genai.configure(api_key=gemini_api_key)
+        model = genai.GenerativeModel('gemini-2.5-flash')
+        
+        # 프롬프트 생성
+        lang_name = language_names.get(source_language, source_language)
+        prompt = f"""당신은 외국어 학습 전문가입니다. 다음 조건에 맞는 문장을 생성해주세요:
+
+        언어: {lang_name}
+        학습할 단어/표현: {target_word}
+        문장 개수: {sentence_count}개
+
+        각 문장은 다음 형식으로 작성해주세요:
+        1. {lang_name} 원문
+        2. 한국어 번역
+
+        요구사항:
+        - '{target_word}'를 반드시 포함해야 합니다
+        - 다양한 문맥에서 사용되는 예문
+        - 스페인어의 경우 활용형(인칭,단수,복수,시제 등)을 다양하게 사용
+        - 각 문장 쌍 사이에 빈 줄 추가
+
+        **[필수 지침: 응답은 오직 요청된 문장 쌍만 포함해야 하며, 어떠한 설명, 서문, 제목도 포함해서는 안 됩니다. 첫 번째 줄은 반드시 {lang_name} 원문 문장으로 시작해야 합니다.]**
+
+        출력 형식 (반드시 이 형식을 따라주세요):
+        원문 문장
+        한국어 번역
+        ...
+        """
+        
+        # AI 생성
+        response = model.generate_content(prompt)
+        generated_text = response.text.strip()
+
+        # 생성된 텍스트를 파싱하여 문장 쌍으로 변환
+        # 1. generated_text를 줄바꿈 기준으로 분리하고, 각 줄의 양 끝 공백과 빈 줄을 제거
+        lines = [line.strip() for line in generated_text.split('\n') if line.strip()]
+
+        # ------------------------------------------------------------
+        # 2. [추가된 후처리 로직]: 첫 줄에 불필요한 서문이 있는지 확인하고 제거
+        # ------------------------------------------------------------
+
+        # 첫 줄이 있고, 해당 줄이 AI가 추가한 서문일 가능성이 높은지 확인 (예: 목록 시작, 설명 문구)
+        # 스페인어 원문을 기대하므로, 한국어 설명 문구에 흔히 쓰이는 키워드가 포함되면 서문으로 간주합니다.
+        if lines:
+            first_line = lines[0].lower()
+            # '다음은', '여기', '목록', '아래', '입니다' 등의 키워드가 포함되어 있으면 서문일 가능성이 높음
+            if any(keyword in first_line for keyword in ['다음은', '여기', '목록', '아래', '입니다', '다음과']):
+                # 첫 줄이 서문일 경우, 해당 줄을 제거합니다.
+                lines = lines[1:]
+
+        # ------------------------------------------------------------
+        # 3. 파싱 로직 (기존 코드)
+        # ------------------------------------------------------------
+        sentences_to_process = []
+        i = 0
+        while i < len(lines):
+            if i + 1 < len(lines):
+                original = lines[i]
+                translation = lines[i + 1]
+                sentences_to_process.append({
+                    'text': original,
+                    'translation': translation
+                })
+                i += 2
+            else:
+                # 홀수 번째 줄만 남는 경우 (번역이 없는 경우), 해당 줄은 무시하고 종료
+                i += 1
+                
+        if not sentences_to_process:
+            # 후처리 후에도 문장 쌍이 없으면 에러 처리
+            return HttpResponse("문장 생성에 실패했습니다. 다시 시도해주세요.", status=500)
+        
+        # TTS 처리 (기존 process_file_view와 동일한 로직)
+        try:
+            tts_client = get_tts_client()
+            original_voice_config = get_voice_config(source_language)
+        except Exception as e:
+            return HttpResponse(f"TTS 클라이언트 초기화 오류: {e}", status=500)
+        
+        combined_audio = AudioSegment.empty()
+        sync_data = []
+        current_time_ms = 0.0
+        
+        silent_break_between_sets = AudioSegment.silent(duration=2000)
+        silent_break_for_repeat = AudioSegment.silent(duration=1000)
+        
+        for i, sentence_pair in enumerate(sentences_to_process):
+            original_text = sentence_pair['text']
+            try:
+                audio_bytes = generate_tts_audio(tts_client, original_text, original_voice_config, speaking_rate=0.8, volume_gain_db=3.0)
+                original_audio_clip = AudioSegment.from_file(io.BytesIO(audio_bytes), format="mp3")
+                
+                repeated_audio_clip = (
+                    silent_break_for_repeat + original_audio_clip +
+                    silent_break_for_repeat + original_audio_clip +
+                    silent_break_for_repeat + original_audio_clip +
+                    silent_break_for_repeat
+                )
+                
+                start_time = current_time_ms / 1000.0
+                duration = len(repeated_audio_clip) / 1000.0
+                end_time = start_time + duration
+                
+                sync_data.append({
+                    'text': sentence_pair['text'],
+                    'translation': sentence_pair['translation'],
+                    'start': start_time,
+                    'end': end_time
+                })
+                
+                combined_audio += repeated_audio_clip
+                current_time_ms += len(repeated_audio_clip)
+                
+                if i < len(sentences_to_process) - 1:
+                    combined_audio += silent_break_between_sets
+                    current_time_ms += len(silent_break_between_sets)
+                    
+            except Exception as e:
+                logger.error(f"TTS 생성 중 오류: {e}")
+                if i < len(sentences_to_process) - 1:
+                    combined_audio += silent_break_between_sets
+                    current_time_ms += len(silent_break_between_sets)
+        
+        if not combined_audio:
+            return HttpResponse("생성된 오디오 클립이 없습니다.", status=500)
+        
+        combined_audio = combined_audio.normalize(headroom=-1.0)
+        
+        output_mp3_io = io.BytesIO()
+        combined_audio.export(output_mp3_io, format="mp3")
+        mp3_bytes = output_mp3_io.getvalue()
+        
+        mp3_base64 = base64.b64encode(mp3_bytes).decode('utf-8')
+        
+        # DB에 저장
+        category = None
+        if category_id:
+            try:
+                category = Category.objects.get(id=int(category_id))
+            except Category.DoesNotExist:
+                pass
+        
+        original_texts = '\n'.join([s['text'] for s in sentences_to_process])
+        translated_texts = '\n'.join([s['translation'] for s in sentences_to_process])
+        
+        audio_obj = AudioContent.objects.create(
+            user=request.user,
+            title=title,
+            category=category,
+            original_text=original_texts,
+            translated_text=translated_texts,
+            audio_data=mp3_base64,
+            sync_data=json.dumps(sync_data)
+        )
+        
+        filename = f"{slugify(title) or 'ai-audio'}-{int(time.time())}.mp3"
+        audio_obj.audio_file.save(filename, ContentFile(mp3_bytes))
+        audio_obj.save()
+        
+        return redirect('audio_detail', audio_id=audio_obj.id)
+        
+    except Exception as e:
+        logger.error(f"AI 문장 생성 오류: {e}")
+        return HttpResponse(f"문장 생성 중 오류가 발생했습니다: {e}", status=500)
+
+
+# -----------------------------------------------------------
+# 보관함 관련 뷰
+# -----------------------------------------------------------
+
+@login_required
+def collection_list(request):
+    """사용자의 보관함 목록을 보여줍니다."""
+    collections = Collection.objects.filter(user=request.user)
+    return render(request, 'core/collection_list.html', {'collections': collections})
+
+
+@login_required
+def collection_detail(request, collection_id):
+    """보관함의 상세 정보와 포함된 오디오를 보여줍니다."""
+    collection = get_object_or_404(Collection, id=collection_id, user=request.user)
+    audios = collection.audio_contents.all()
+    return render(request, 'core/collection_detail.html', {
+        'collection': collection,
+        'audios': audios
+    })
+
+
+@login_required
+def create_collection(request):
+    """새 보관함을 생성합니다."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body.decode('utf-8'))
+        name = data.get('name', '').strip()
+        description = data.get('description', '').strip()
+        
+        if not name:
+            return JsonResponse({'error': '보관함 이름을 입력해주세요.'}, status=400)
+
+        # 같은 이름의 보관함이 있는지 확인
+        if Collection.objects.filter(user=request.user, name=name).exists():
+            return JsonResponse({'error': '같은 이름의 보관함이 이미 있습니다.'}, status=400)
+
+        collection = Collection.objects.create(
+            user=request.user,
+            name=name,
+            description=description
+        )
+        
+        return JsonResponse({
+            'id': collection.id,
+            'name': collection.name,
+            'description': collection.description
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def delete_collection(request, collection_id):
+    """보관함을 삭제합니다."""
+    collection = get_object_or_404(Collection, id=collection_id, user=request.user)
+    
+    if request.method == 'POST':
+        collection.delete()
+        return redirect('collection_list')
+    
+    return render(request, 'core/collection_confirm_delete.html', {'collection': collection})
+
+
+@login_required
+def update_collection(request, collection_id):
+    """보관함 정보를 수정합니다."""
+    collection = get_object_or_404(Collection, id=collection_id, user=request.user)
+    
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST method required'}, status=405)
+    
+    try:
+        data = json.loads(request.body)
+        
+        if 'name' in data:
+            new_name = data['name'].strip()
+            if not new_name:
+                return JsonResponse({'error': '보관함 이름은 비워둘 수 없습니다.'}, status=400)
+            
+            # 같은 이름의 다른 보관함이 있는지 확인
+            if Collection.objects.filter(user=request.user, name=new_name).exclude(id=collection_id).exists():
+                return JsonResponse({'error': '같은 이름의 보관함이 이미 있습니다.'}, status=400)
+            
+            collection.name = new_name
+        
+        if 'description' in data:
+            collection.description = data['description'].strip()
+        
+        collection.save()
+        
+        return JsonResponse({
+            'success': True,
+            'name': collection.name,
+            'description': collection.description
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({'error': '잘못된 요청 형식입니다.'}, status=400)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def add_to_collection(request, audio_id):
+    """오디오를 보관함에 추가합니다."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        # 오디오는 다른 사용자의 것도 추가 가능
+        audio = get_object_or_404(AudioContent, id=audio_id)
+        
+        # 요청 본문 파싱
+        try:
+            data = json.loads(request.body.decode('utf-8'))
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON 파싱 오류: {e}")
+            return JsonResponse({'error': 'JSON 형식이 잘못되었습니다.'}, status=400)
+        
+        collection_id = data.get('collection_id')
+        
+        if not collection_id:
+            return JsonResponse({'error': '보관함을 선택해주세요.'}, status=400)
+
+        # 보관함은 본인 것만
+        try:
+            collection = Collection.objects.get(id=collection_id, user=request.user)
+        except Collection.DoesNotExist:
+            return JsonResponse({'error': '보관함을 찾을 수 없습니다.'}, status=404)
+        
+        # 이미 추가되어 있는지 확인
+        if collection.audio_contents.filter(id=audio_id).exists():
+            return JsonResponse({'error': '이미 이 보관함에 추가되어 있습니다.'}, status=400)
+        
+        collection.audio_contents.add(audio)
+        
+        logger.info(f"Audio {audio_id} added to collection {collection_id} by user {request.user.username}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'"{audio.title}"을(를) "{collection.name}" 보관함에 추가했습니다.'
+        })
+    except Exception as e:
+        logger.error(f"보관함 추가 오류: {e}", exc_info=True)
+        return JsonResponse({'error': f'오류가 발생했습니다: {str(e)}'}, status=500)
+
+
+@login_required
+def remove_from_collection(request, collection_id, audio_id):
+    """보관함에서 오디오를 제거합니다."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        collection = get_object_or_404(Collection, id=collection_id, user=request.user)
+        audio = get_object_or_404(AudioContent, id=audio_id)
+        
+        collection.audio_contents.remove(audio)
+        
+        return JsonResponse({
+            'success': True,
+            'message': '보관함에서 제거되었습니다.'
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def get_user_collections(request):
+    """사용자의 보관함 목록을 JSON으로 반환합니다."""
+    collections = Collection.objects.filter(user=request.user)
+    data = [
+        {
+            'id': c.id,
+            'name': c.name,
+            'count': c.audio_contents.count()
+        }
+        for c in collections
+    ]
+    return JsonResponse({'collections': data})
 

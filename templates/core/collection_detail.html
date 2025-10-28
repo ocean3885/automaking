@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ collection.name }} - AutoMaking{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>
+            <span id="collectionNameDisplay" style="cursor: pointer;" title="클릭하여 이름 수정">
+                <i class="fas fa-folder"></i> {{ collection.name }}
+            </span>
+        </h1>
+        <div>
+            <a href="{% url 'collection_list' %}" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> 보관함 목록
+            </a>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="mb-2">
+                <strong>설명:</strong>
+                <span id="collectionDescDisplay" style="cursor: pointer;" title="클릭하여 설명 수정">
+                    {{ collection.description|default:"설명 없음" }}
+                </span>
+            </div>
+            <p class="mb-1"><strong>생성일:</strong> {{ collection.created_at|date:"Y년 m월 d일 H:i" }}</p>
+            <p class="mb-0"><strong>항목 수:</strong> {{ audios.count }}개</p>
+        </div>
+    </div>
+
+    {% if audios %}
+    <div class="card">
+        <div class="card-header">
+            <h5 class="mb-0">보관함 항목</h5>
+        </div>
+        <div class="card-body">
+            <div class="list-group">
+                {% for audio in audios %}
+                <div class="list-group-item">
+                    <div class="d-flex w-100 justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1">{{ audio.title }}</h5>
+                            <p class="mb-1 text-muted">
+                                {% if audio.category %}
+                                    <span class="badge bg-secondary">{{ audio.category.name }}</span>
+                                {% endif %}
+                                <small>작성자: {{ audio.user.username }}</small>
+                            </p>
+                            <small class="text-muted">
+                                <i class="fas fa-eye"></i> {{ audio.view_count }}회 조회 | 
+                                {{ audio.created_at|date:"Y-m-d" }}
+                            </small>
+                        </div>
+                        <div class="btn-group">
+                            <a href="{% url 'audio_detail' audio.id %}" class="btn btn-sm btn-outline-primary">
+                                <i class="fas fa-play"></i> 학습하기
+                            </a>
+                            <button class="btn btn-sm btn-outline-danger remove-from-collection-btn" 
+                                    data-audio-id="{{ audio.id }}" 
+                                    data-audio-title="{{ audio.title }}">
+                                <i class="fas fa-times"></i> 제거
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> 이 보관함에는 아직 항목이 없습니다.
+        <a href="{% url 'audio_list' %}" class="alert-link">음성 목록</a>에서 추가해보세요!
+    </div>
+    {% endif %}
+</div>
+
+<!-- Font Awesome CDN -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<script>
+// 보관함 이름 수정
+const nameDisplay = document.getElementById('collectionNameDisplay');
+let isEditingName = false;
+let originalName = "{{ collection.name }}";
+
+nameDisplay.addEventListener('click', async () => {
+    if (isEditingName) return;
+    
+    const newName = prompt('새 보관함 이름을 입력하세요:', originalName);
+    if (!newName || newName === originalName) return;
+    
+    try {
+        const response = await fetch('{% url "update_collection" collection.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ name: newName })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            originalName = data.name;
+            nameDisplay.innerHTML = `<i class="fas fa-folder"></i> ${data.name}`;
+        } else {
+            alert(data.error || '이름 변경에 실패했습니다.');
+        }
+    } catch (error) {
+        alert('오류가 발생했습니다.');
+        console.error(error);
+    }
+});
+
+// 보관함 설명 수정
+const descDisplay = document.getElementById('collectionDescDisplay');
+let originalDesc = "{{ collection.description|default:'' }}";
+
+descDisplay.addEventListener('click', async () => {
+    const newDesc = prompt('새 설명을 입력하세요:', originalDesc);
+    if (newDesc === null) return; // 취소
+    
+    try {
+        const response = await fetch('{% url "update_collection" collection.id %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ description: newDesc })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            originalDesc = data.description;
+            descDisplay.textContent = data.description || '설명 없음';
+        } else {
+            alert(data.error || '설명 변경에 실패했습니다.');
+        }
+    } catch (error) {
+        alert('오류가 발생했습니다.');
+        console.error(error);
+    }
+});
+
+// 보관함에서 제거
+document.querySelectorAll('.remove-from-collection-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        const audioId = this.getAttribute('data-audio-id');
+        const audioTitle = this.getAttribute('data-audio-title');
+        
+        if (!confirm(`"${audioTitle}"을(를) 이 보관함에서 제거하시겠습니까?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`{% url 'remove_from_collection' collection.id 0 %}`.replace('/0/', `/${audioId}/`), {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            });
+
+            const data = await response.json();
+            
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                alert(data.error || '제거에 실패했습니다.');
+            }
+        } catch (error) {
+            alert('오류가 발생했습니다.');
+            console.error(error);
+        }
+    });
+});
+</script>
+{% endblock %}

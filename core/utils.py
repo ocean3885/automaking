@@ -14,23 +14,30 @@ def get_tts_client():
         raise ImproperlyConfigured(f"TTS 클라이언트 초기화 실패: {e}")
 
 def get_voice_config(lang_code):
-    """언어 코드에 따른 TTS 음성 설정을 반환합니다."""
-    # 실제 사용 가능한 음성 이름으로 교체해야 합니다.
-    if lang_code == 'es':
-        # 예시: 스페인어 여성 목소리
+    """언어 코드에 따른 TTS 음성 설정을 반환합니다.
+    지원: es, ko, en, fr, de, ja, zh
+    해당되지 않으면 기본(language_code만 지정)으로 반환합니다.
+    """
+    mapping = {
+        'es': { 'language_code': 'es-ES', 'name': 'es-ES-Wavenet-D' },
+        'ko': { 'language_code': 'ko-KR', 'name': 'ko-KR-Wavenet-A' },
+        'en': { 'language_code': 'en-US', 'name': 'en-US-Wavenet-D' },
+        'fr': { 'language_code': 'fr-FR', 'name': 'fr-FR-Wavenet-A' },
+        'de': { 'language_code': 'de-DE', 'name': 'de-DE-Wavenet-A' },
+        'ja': { 'language_code': 'ja-JP', 'name': 'ja-JP-Wavenet-B' },
+        # 중국어(표준어)는 cmn-CN가 일반적이지만, ko-KR/ja-JP와의 일관성을 위해 zh-CN도 허용
+        # Google Cloud TTS에서는 cmn-CN 계열을 사용합니다.
+        'zh': { 'language_code': 'cmn-CN', 'name': 'cmn-CN-Wavenet-A' },
+    }
+
+    conf = mapping.get(lang_code)
+    if conf:
         return texttospeech.VoiceSelectionParams(
-            language_code="es-ES", 
-            name="es-ES-Wavenet-D" # 실제 사용 가능한 Wavenet 음성
+            language_code=conf['language_code'],
+            name=conf['name']
         )
-    elif lang_code == 'ko':
-        # 예시: 한국어 여성 목소리
-        return texttospeech.VoiceSelectionParams(
-            language_code="ko-KR", 
-            name="ko-KR-Wavenet-A" # 실제 사용 가능한 Wavenet 음성
-        )
-    else:
-        # 기본 음성
-        return texttospeech.VoiceSelectionParams(language_code=lang_code)
+    # 기본 음성(언어 코드만 지정)
+    return texttospeech.VoiceSelectionParams(language_code=lang_code)
 
 def generate_tts_audio(client, text, voice_config, speaking_rate=1.0, volume_gain_db=0.0):
     """Google Cloud TTS API를 호출하여 오디오 콘텐츠(바이트)를 반환합니다."""

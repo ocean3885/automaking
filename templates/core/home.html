@@ -3,20 +3,129 @@
 {% block title %}홈 - AutoMaking{% endblock %}
 
 {% block content %}
-<div class="text-center py-5">
-    <h1 class="display-4">AutoMaking에 오신 것을 환영합니다</h1>
-    <p class="lead">자동화된 음성 생성 서비스</p>
-    
-    {% if user.is_authenticated %}
-        <div class="mt-4">
-            <a href="{% url 'upload' %}" class="btn btn-primary btn-lg">음성 만들기</a>
-            <a href="{% url 'audio_list' %}" class="btn btn-success btn-lg ms-3">내 학습 목록</a>
+<div class="container">
+    <div class="text-center py-5">
+        <h1 class="display-4">AutoMaking에 오신 것을 환영합니다</h1>
+        <p class="lead">자동화된 음성 생성 서비스</p>
+        
+        {% if user.is_authenticated %}
+            <div class="mt-4">
+                <a href="{% url 'upload' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-plus-circle"></i> 음성 만들기
+                </a>
+                <a href="{% url 'audio_list' %}" class="btn btn-success btn-lg ms-3">
+                    <i class="fas fa-list"></i> 내 학습 목록
+                </a>
+                <a href="{% url 'collection_list' %}" class="btn btn-info btn-lg ms-3">
+                    <i class="fas fa-folder"></i> 내 보관함
+                </a>
+            </div>
+        {% else %}
+            <div class="mt-4">
+                <a href="{% url 'account_login' %}" class="btn btn-primary btn-lg">로그인하여 시작하기</a>
+                <a href="{% url 'account_signup' %}" class="btn btn-outline-primary btn-lg ms-2">회원가입</a>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if category_posts %}
+    <div class="my-5">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-fire"></i> 카테고리별 최신 게시물</h2>
+            <div class="text-muted">
+                <small>
+                    <i class="fas fa-music"></i> 전체 게시물: {{ total_posts }}개 | 
+                    <i class="fas fa-tag"></i> 카테고리: {{ total_categories }}개
+                </small>
+            </div>
         </div>
+
+        {% for item in category_posts %}
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="fas fa-tag"></i> 
+                    {% if item.category %}
+                        {{ item.category.name }}
+                    {% else %}
+                        카테고리 없음
+                    {% endif %}
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for post in item.posts %}
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card h-100 shadow-sm">
+                            <div class="card-body">
+                                <h6 class="card-title">
+                                    <a href="{% url 'audio_detail' post.id %}" class="text-decoration-none">
+                                        {{ post.title }}
+                                    </a>
+                                </h6>
+                                <p class="card-text small text-muted mb-2">
+                                    <i class="fas fa-user"></i> {{ post.user.username }}
+                                </p>
+                                <p class="card-text small text-muted mb-2">
+                                    <i class="fas fa-eye"></i> {{ post.view_count }}회 조회
+                                </p>
+                                <p class="card-text small text-muted">
+                                    <i class="fas fa-clock"></i> {{ post.created_at|date:"Y-m-d H:i" }}
+                                </p>
+                            </div>
+                            <div class="card-footer bg-transparent border-top-0">
+                                <a href="{% url 'audio_detail' post.id %}" class="btn btn-sm btn-outline-primary w-100">
+                                    <i class="fas fa-play"></i> 학습하기
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% if item.category %}
+            <div class="card-footer">
+                <a href="{% url 'audio_list' %}?category={{ item.category.id }}" class="text-decoration-none">
+                    {{ item.category.name }} 카테고리 전체보기 <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
     {% else %}
-        <div class="mt-4">
-            <a href="{% url 'account_login' %}" class="btn btn-primary">로그인하여 시작하기</a>
-            <a href="{% url 'account_signup' %}" class="btn btn-outline-primary ms-2">회원가입</a>
-        </div>
+    <div class="alert alert-info text-center my-5">
+        <i class="fas fa-info-circle fa-3x mb-3"></i>
+        <h4>아직 게시물이 없습니다</h4>
+        <p>첫 번째 음성 파일을 만들어보세요!</p>
+        {% if user.is_authenticated %}
+        <a href="{% url 'upload' %}" class="btn btn-primary mt-3">
+            <i class="fas fa-plus-circle"></i> 음성 만들기
+        </a>
+        {% endif %}
+    </div>
     {% endif %}
 </div>
+
+<!-- Font Awesome CDN -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<style>
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.card-title a {
+    color: #333;
+}
+
+.card-title a:hover {
+    color: #007bff;
+}
+</style>
 {% endblock %}

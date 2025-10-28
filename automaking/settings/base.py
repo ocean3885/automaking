@@ -1,54 +1,42 @@
+"""
+Django base settings for automaking project.
+모든 환경에서 공통으로 사용하는 설정입니다.
+"""
 from pathlib import Path
 import os
-import json 
-from pathlib import Path
+import json
 from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # -----------------------------------------------------------
-# 1. Secret.json 파일에서 설정 불러오기
+# Secret.json 파일에서 설정 불러오기
 # -----------------------------------------------------------
 
 secret_file = BASE_DIR / 'secret.json'
 
 if not os.path.exists(secret_file):
-    # 파일이 없으면 에러 발생 (보안 강제)
-    # ImproperlyConfigured는 django.core.exceptions에서 임포트해야 합니다.
     raise ImproperlyConfigured(f"'{secret_file}' 파일이 프로젝트 루트에 필요합니다.")
 
 with open(secret_file) as f:
     secrets = json.loads(f.read())
 
-# secrets 딕셔너리에서 특정 키를 가져오는 함수 (키가 없으면 에러 발생)
 def get_secret(setting, secrets_dict=secrets):
+    """secrets 딕셔너리에서 특정 키를 가져오는 함수"""
     try:
         return secrets_dict[setting]
     except KeyError:
         error_msg = f"'{setting}' 키가 secret.json 파일에 없습니다."
         raise ImproperlyConfigured(error_msg)
 
-# -----------------------------------------------------------
-# 2. Django 설정 변수 대체 (가장 중요한 수정 부분)
-# -----------------------------------------------------------
+# SECRET_KEY
+SECRET_KEY = get_secret("SECRET_KEY")
 
-# 하드 코딩된 SECRET_KEY를 secret.json의 값으로 대체합니다.
-SECRET_KEY = get_secret("SECRET_KEY") 
-
-# TTS 관련 설정을 secret.json에서 가져와 별도의 변수로 정의합니다.
+# TTS 관련 설정
 GOOGLE_CLOUD_CREDENTIALS_JSON = get_secret("GOOGLE_CLOUD_CREDENTIALS")
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
-
 
 # Application definition
-
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -71,10 +59,10 @@ AUTHENTICATION_BACKENDS = [
     'allauth.account.auth_backends.AuthenticationBackend',
 ]
 
-LOGIN_REDIRECT_URL = '/'  # 로그인 후 리디렉션될 URL
-ACCOUNT_EMAIL_VERIFICATION = 'none'  # 이메일 인증 없이 가입 가능
-ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']  # 필수 가입 필드
-ACCOUNT_LOGIN_METHODS = {'email'}  # 로그인시 이메일 사용
+LOGIN_REDIRECT_URL = '/'
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
+ACCOUNT_LOGIN_METHODS = {'email'}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -106,21 +94,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "automaking.wsgi.application"
 
-
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
-
-
 # Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -136,22 +110,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'ko-kr'
-
 TIME_ZONE = 'Asia/Seoul'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
 STATIC_URL = "static/"
 
 # Media files (user uploaded)
@@ -159,6 +124,4 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

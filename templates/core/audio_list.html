@@ -10,7 +10,7 @@
     <h1 class="mb-4">내 음성 파일</h1>
 
     <div class="row mb-4">
-        <div class="col-md-4">
+        <div class="col-md-3">
             <select class="form-select" id="categoryFilter">
                 <option value="">모든 카테고리</option>
                 {% for category in categories %}
@@ -20,12 +20,17 @@
                 {% endfor %}
             </select>
         </div>
-        <div class="col-md-6">
+        <div class="col-md-5">
             <div class="input-group">
                 <input type="text" class="form-control" id="searchInput" placeholder="제목 검색..."
                        value="{{ search_query }}">
                 <button class="btn btn-outline-secondary" type="button" id="searchBtn">검색</button>
             </div>
+        </div>
+        <div class="col-md-2">
+            <a href="{% url 'collection_list' %}" class="btn btn-outline-info w-100">
+                <i class="fas fa-folder"></i> 보관함
+            </a>
         </div>
         <div class="col-md-2">
             <a href="{% url 'upload' %}" class="btn btn-primary w-100">새 파일 업로드</a>
@@ -46,8 +51,22 @@
                         <i class="fas fa-eye"></i> 조회수: <strong>{{ audio.view_count }}</strong>
                     </p>
                     <div class="d-flex justify-content-between">
-                        <a href="{% url 'audio_detail' audio.id %}" class="btn btn-primary">학습하기</a>
-                        <button class="btn btn-outline-danger delete-btn" data-id="{{ audio.id }}">삭제</button>
+                        <div>
+                            <a href="{% url 'audio_detail' audio.id %}" class="btn btn-sm btn-primary">학습하기</a>
+                            {% if audio.id not in audio_ids_in_collections %}
+                            <button class="btn btn-sm btn-success add-to-collection-btn" 
+                                    data-audio-id="{{ audio.id }}"
+                                    data-audio-title="{{ audio.title }}"
+                                    title="보관함에 추가">
+                                <i class="fas fa-folder-plus"></i>
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-secondary" disabled title="이미 보관함에 추가됨">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            {% endif %}
+                        </div>
+                        <button class="btn btn-sm btn-outline-danger delete-btn" data-id="{{ audio.id }}">삭제</button>
                     </div>
                 </div>
             </div>
@@ -88,6 +107,9 @@
 </div>
 
 <script>
+// DOM이 완전히 로드된 후 실행
+document.addEventListener('DOMContentLoaded', function() {
+
 document.getElementById('categoryFilter').addEventListener('change', function() {
     updateUrl();
 });
@@ -143,5 +165,127 @@ document.querySelectorAll('.delete-btn').forEach(btn => {
         }
     });
 });
+
+// 보관함에 추가 버튼
+let userCollections = [];
+let selectedAudioId = null;
+let selectedAudioTitle = '';
+
+async function loadUserCollections() {
+    try {
+        const response = await fetch('{% url "get_user_collections" %}');
+        const data = await response.json();
+        userCollections = data.collections;
+        
+        const select = document.getElementById('collectionSelect');
+        select.innerHTML = '<option value="">보관함 선택</option>';
+        
+        userCollections.forEach(collection => {
+            const option = document.createElement('option');
+            option.value = collection.id;
+            option.textContent = `${collection.name} (${collection.count}개)`;
+            select.appendChild(option);
+        });
+        
+        if (userCollections.length === 0) {
+            select.innerHTML = '<option value="">보관함이 없습니다</option>';
+        }
+    } catch (error) {
+        console.error('보관함 로딩 오류:', error);
+    }
+}
+
+document.querySelectorAll('.add-to-collection-btn').forEach(btn => {
+    btn.addEventListener('click', async function() {
+        selectedAudioId = this.getAttribute('data-audio-id');
+        selectedAudioTitle = this.getAttribute('data-audio-title');
+        
+        await loadUserCollections();
+        
+        const modal = new bootstrap.Modal(document.getElementById('addToCollectionModal'));
+        modal.show();
+    });
+});
+
+const addToCollectionBtn = document.getElementById('addToCollectionBtn');
+if (addToCollectionBtn) {
+    addToCollectionBtn.addEventListener('click', async function() {
+        const collectionId = document.getElementById('collectionSelect').value;
+        
+        if (!collectionId) {
+            alert('보관함을 선택해주세요.');
+            return;
+        }
+
+        // CSRF 토큰 가져오기
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+        if (!csrfToken) {
+            alert('CSRF 토큰을 찾을 수 없습니다. 페이지를 새로고침해주세요.');
+            return;
+        }
+
+        console.log('Adding audio', selectedAudioId, 'to collection', collectionId);
+
+        try {
+            const response = await fetch(`/audio/${selectedAudioId}/add-to-collection/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ collection_id: collectionId })
+            });
+
+            const data = await response.json();
+            
+            console.log('Response:', response.status, data);
+            
+            if (response.ok) {
+                alert(data.message);
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addToCollectionModal'));
+                modal.hide();
+            } else {
+                alert(data.error || '보관함에 추가하지 못했습니다.');
+            }
+        } catch (error) {
+            alert('오류가 발생했습니다: ' + error.message);
+            console.error('Error:', error);
+        }
+    });
+}
+
+}); // DOMContentLoaded 끝
 </script>
+
+<!-- CSRF Token for AJAX -->
+{% csrf_token %}
+
+<!-- 보관함에 추가 모달 -->
+<div class="modal fade" id="addToCollectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">보관함에 추가</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="collectionSelect" class="form-label">보관함 선택</label>
+                    <select class="form-select" id="collectionSelect">
+                        <option value="">로딩 중...</option>
+                    </select>
+                </div>
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    <a href="{% url 'collection_list' %}" target="_blank">보관함 관리 페이지</a>에서 새 보관함을 만들 수 있습니다.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary" id="addToCollectionBtn">추가</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

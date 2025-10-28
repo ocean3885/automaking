@@ -13,6 +13,23 @@ class Category(models.Model):
         verbose_name_plural = "Categories"
         ordering = ['name']
 
+
+class Collection(models.Model):
+    """사용자별 보관함"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='collections')
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.name}"
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['user', 'name']  # 같은 사용자는 같은 이름의 보관함을 중복 생성 불가
+
+
 class AudioContent(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audio_contents')
     title = models.CharField(max_length=200)
@@ -23,6 +40,7 @@ class AudioContent(models.Model):
     audio_file = models.FileField(upload_to='audios/', null=True, blank=True)
     sync_data = models.TextField(null=True, blank=True)  # JSON 문자열으로 저장된 타임스탬프 데이터
     view_count = models.IntegerField(default=0)  # 조회수
+    collections = models.ManyToManyField(Collection, related_name='audio_contents', blank=True)  # 보관함 다대다 관계
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

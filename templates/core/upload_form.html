@@ -5,53 +5,151 @@
 {% block content %}
 <div class="container">
     <h1 class="mb-4">📚 어학 문장 영상 제작</h1>
-    <p>암기하고 싶은 문장이 정리된 TXT 파일을 첨부하고 필요한 정보를 입력한 후 실행 버튼을 눌러주세요.</p>
     
-    <form method="post" action="{% url 'process' %}" enctype="multipart/form-data" class="needs-validation" novalidate>
-        {% csrf_token %}
+    <!-- 탭 네비게이션 -->
+    <ul class="nav nav-tabs mb-4" id="uploadTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="file-tab" data-bs-toggle="tab" data-bs-target="#file-upload-pane" type="button" role="tab">
+                📄 파일 업로드
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="ai-tab" data-bs-toggle="tab" data-bs-target="#ai-generate-pane" type="button" role="tab">
+                🤖 AI 문장 생성
+            </button>
+        </li>
+    </ul>
+    
+    <!-- 탭 콘텐츠 -->
+    <div class="tab-content" id="uploadTabsContent">
         
-        <div class="mb-3">
-            <label for="title" class="form-label">제목</label>
-            <input type="text" class="form-control" id="title" name="title" required>
-        </div>
-        
-        <div class="mb-3">
-            <label for="category" class="form-label">카테고리</label>
-            <select class="form-select" id="category" name="category" required>
-                <option value="">카테고리 선택</option>
-                {% for category in categories %}
-                <option value="{{ category.id }}">{{ category.name }}</option>
-                {% endfor %}
-            </select>
-            <div class="mt-2">
-                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
-                    새 카테고리 추가
-                </button>
-            </div>
-        </div>
-        
-        <div class="mb-3">
-            <label for="file_upload" class="form-label">TXT 파일 선택</label>
-            <input type="file" class="form-control" id="file_upload" name="input_file" accept=".txt" required>
-        </div>
-        
-        <div class="card mb-3">
-            <div class="card-body">
-                <h6 class="card-title">파일 형식 예시:</h6>
-                <pre class="mb-0">
-Yo quiero un café.
+        <!-- 파일 업로드 탭 -->
+        <div class="tab-pane fade show active" id="file-upload-pane" role="tabpanel">
+            <p>암기하고 싶은 문장이 정리된 TXT 파일을 첨부하고 필요한 정보를 입력한 후 실행 버튼을 눌러주세요.</p>
+            
+            <form method="post" action="{% url 'process' %}" enctype="multipart/form-data" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="title" class="form-label">제목</label>
+                    <input type="text" class="form-control" id="title" name="title" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="category" class="form-label">카테고리</label>
+                    <select class="form-select" id="category" name="category" required>
+                        <option value="">카테고리 선택</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if user.is_staff %}
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
+                            새 카테고리 추가
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="file_upload" class="form-label">TXT 파일 선택</label>
+                    <input type="file" class="form-control" id="file_upload" name="input_file" accept=".txt" required>
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="card-title">파일 형식 예시:</h6>
+                        <pre class="mb-0">Yo quiero un café.
 나는 커피 한 잔을 원해.
 
 Tú quieres ir al cine.
 너는 영화 보러 가고 싶어 해.</pre>
-            </div>
+                    </div>
+                </div>
+                
+                <button type="submit" class="btn btn-primary">🎬 실행 (TTS 변환 및 저장)</button>
+                <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary">내 음성 파일 목록</a>
+            </form>
         </div>
         
-        <button type="submit" class="btn btn-primary">🎬 실행 (TTS 변환 및 저장)</button>
-        <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary">내 음성 파일 목록</a>
-    </form>
+        <!-- AI 문장 생성 탭 -->
+        <div class="tab-pane fade" id="ai-generate-pane" role="tabpanel">
+            <p>AI가 학습용 문장을 자동으로 생성합니다. 언어와 단어를 입력하고 필요한 문장 개수를 선택하세요.</p>
+            
+            <form method="post" action="{% url 'generate_sentences' %}" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="ai_title" class="form-label">제목</label>
+                    <input type="text" class="form-control" id="ai_title" name="title" required>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="ai_category" class="form-label">카테고리</label>
+                    <select class="form-select" id="ai_category" name="category" required>
+                        <option value="">카테고리 선택</option>
+                        {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                    {% if user.is_staff %}
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#newCategoryModal">
+                            새 카테고리 추가
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="source_language" class="form-label">원문 언어</label>
+                    <select class="form-select" id="source_language" name="source_language" required>
+                        <option value="">언어 선택</option>
+                        <option value="es">스페인어</option>
+                        <option value="en">영어</option>
+                        <option value="fr">프랑스어</option>
+                        <option value="de">독일어</option>
+                        <option value="ja">일본어</option>
+                        <option value="zh">중국어</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="target_word" class="form-label">학습할 단어/표현</label>
+                    <input type="text" class="form-control" id="target_word" name="target_word" 
+                           placeholder="예: quiero (원하다)" required>
+                    <small class="text-muted">이 단어를 포함한 문장이 생성됩니다</small>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="sentence_count" class="form-label">생성할 문장 개수</label>
+                    <select class="form-select" id="sentence_count" name="sentence_count" required>
+                        <option value="3">3개</option>
+                        <option value="5" selected>5개</option>
+                        <option value="10">10개</option>
+                        <option value="15">15개</option>
+                        <option value="20">20개</option>
+                    </select>
+                </div>
+                
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    AI가 선택한 언어로 문장을 생성하고 한국어 번역을 제공합니다.
+                </div>
+                
+                <button type="submit" class="btn btn-success" id="generateBtn">
+                    <span class="spinner-border spinner-border-sm d-none" id="generateSpinner"></span>
+                    🤖 AI로 문장 생성하기
+                </button>
+                <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary">내 음성 파일 목록</a>
+            </form>
+        </div>
+        
+    </div>
 </div>
 
+{% if user.is_staff %}
 <!-- 새 카테고리 추가 모달 -->
 <div class="modal fade" id="newCategoryModal" tabindex="-1">
     <div class="modal-dialog">
@@ -77,43 +175,63 @@ Tú quieres ir al cine.
 </div>
 
 <script>
-document.getElementById('saveCategoryBtn').addEventListener('click', async function() {
-    const categoryName = document.getElementById('categoryName').value;
-    if (!categoryName) {
-        alert('카테고리 이름을 입력해주세요.');
-        return;
-    }
-
-    try {
-        const response = await fetch('{% url "add_category" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-            },
-            body: JSON.stringify({ name: categoryName })
-        });
-
-        if (response.ok) {
-            const data = await response.json();
-            const select = document.getElementById('category');
-            const option = new Option(data.name, data.id);
-            select.add(option);
-            select.value = data.id;
-            
-            // 모달 닫기
-            const modal = bootstrap.Modal.getInstance(document.getElementById('newCategoryModal'));
-            modal.hide();
-            
-            // 입력 필드 초기화
-            document.getElementById('categoryName').value = '';
-        } else {
-            alert('카테고리 추가에 실패했습니다.');
+// 카테고리 추가
+const saveCategoryBtn = document.getElementById('saveCategoryBtn');
+if (saveCategoryBtn) {
+    saveCategoryBtn.addEventListener('click', async function() {
+        const categoryName = document.getElementById('categoryName').value;
+        if (!categoryName) {
+            alert('카테고리 이름을 입력해주세요.');
+            return;
         }
-    } catch (error) {
-        alert('오류가 발생했습니다.');
-        console.error(error);
-    }
+
+        try {
+            const response = await fetch('{% url "add_category" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify({ name: categoryName })
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                
+                // 두 폼의 select에 모두 추가
+                ['category', 'ai_category'].forEach(selectId => {
+                    const select = document.getElementById(selectId);
+                    const option = new Option(data.name, data.id);
+                    select.add(option);
+                    select.value = data.id;
+                });
+                
+                // 모달 닫기
+                const modal = bootstrap.Modal.getInstance(document.getElementById('newCategoryModal'));
+                modal.hide();
+                
+                // 입력 필드 초기화
+                document.getElementById('categoryName').value = '';
+            } else {
+                const data = await response.json();
+                alert(data.error || '카테고리 추가에 실패했습니다.');
+            }
+        } catch (error) {
+            alert('오류가 발생했습니다.');
+            console.error(error);
+        }
+    });
+}
+</script>
+{% endif %}
+
+<script>
+// AI 생성 폼 제출 시 스피너 표시
+document.querySelector('#ai-generate-pane form').addEventListener('submit', function() {
+    const spinner = document.getElementById('generateSpinner');
+    const btn = document.getElementById('generateBtn');
+    spinner.classList.remove('d-none');
+    btn.disabled = true;
 });
 </script>
 {% endblock %}

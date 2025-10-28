@@ -59,6 +59,10 @@ media/
 secret.json
 .env
 
+# Settings backup
+automaking/settings.py.backup
+automaking/settings_local.py
+
 # Staticfiles
 staticfiles/
 

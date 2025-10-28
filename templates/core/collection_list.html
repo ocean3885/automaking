@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+
+{% block title %}내 보관함 - AutoMaking{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>📂 내 보관함</h1>
+        <div>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCollectionModal">
+                <i class="fas fa-plus"></i> 새 보관함 만들기
+            </button>
+            <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary">음성 목록</a>
+        </div>
+    </div>
+
+    {% if collections %}
+    <div class="row">
+        {% for collection in collections %}
+        <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-folder"></i> {{ collection.name }}
+                    </h5>
+                    {% if collection.description %}
+                    <p class="card-text text-muted">{{ collection.description }}</p>
+                    {% endif %}
+                    <p class="card-text">
+                        <small class="text-muted">
+                            <i class="fas fa-music"></i> {{ collection.audio_contents.count }}개 항목
+                        </small>
+                    </p>
+                    <p class="card-text">
+                        <small class="text-muted">
+                            생성일: {{ collection.created_at|date:"Y년 m월 d일" }}
+                        </small>
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="{% url 'collection_detail' collection.id %}" class="btn btn-sm btn-outline-primary">
+                        <i class="fas fa-eye"></i> 보기
+                    </a>
+                    <button class="btn btn-sm btn-outline-danger delete-collection-btn" data-id="{{ collection.id }}" data-name="{{ collection.name }}">
+                        <i class="fas fa-trash"></i> 삭제
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> 아직 보관함이 없습니다. 새 보관함을 만들어보세요!
+    </div>
+    {% endif %}
+</div>
+
+<!-- 새 보관함 만들기 모달 -->
+<div class="modal fade" id="createCollectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">새 보관함 만들기</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="createCollectionForm">
+                    <div class="mb-3">
+                        <label for="collectionName" class="form-label">보관함 이름 *</label>
+                        <input type="text" class="form-control" id="collectionName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="collectionDescription" class="form-label">설명 (선택)</label>
+                        <textarea class="form-control" id="collectionDescription" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary" id="saveCollectionBtn">생성</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 삭제 확인 모달 -->
+<div class="modal fade" id="deleteCollectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">보관함 삭제</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p><strong id="deleteCollectionName"></strong> 보관함을 삭제하시겠습니까?</p>
+                <p class="text-muted small">보관함만 삭제되며, 포함된 오디오는 삭제되지 않습니다.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">삭제</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Font Awesome CDN -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<script>
+// 보관함 생성
+document.getElementById('saveCollectionBtn').addEventListener('click', async function() {
+    const name = document.getElementById('collectionName').value.trim();
+    const description = document.getElementById('collectionDescription').value.trim();
+    
+    if (!name) {
+        alert('보관함 이름을 입력해주세요.');
+        return;
+    }
+
+    try {
+        const response = await fetch('{% url "create_collection" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ name, description })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+            // 페이지 새로고침
+            window.location.reload();
+        } else {
+            alert(data.error || '보관함 생성에 실패했습니다.');
+        }
+    } catch (error) {
+        alert('오류가 발생했습니다.');
+        console.error(error);
+    }
+});
+
+// 보관함 삭제
+let deleteCollectionId = null;
+const deleteModal = new bootstrap.Modal(document.getElementById('deleteCollectionModal'));
+
+document.querySelectorAll('.delete-collection-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+        deleteCollectionId = this.getAttribute('data-id');
+        const collectionName = this.getAttribute('data-name');
+        document.getElementById('deleteCollectionName').textContent = collectionName;
+        deleteModal.show();
+    });
+});
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
+    if (!deleteCollectionId) return;
+
+    try {
+        const response = await fetch(`/collections/${deleteCollectionId}/delete/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}'
+            }
+        });
+
+        if (response.ok) {
+            window.location.reload();
+        } else {
+            alert('삭제에 실패했습니다.');
+        }
+    } catch (error) {
+        alert('오류가 발생했습니다.');
+        console.error(error);
+    }
+});
+</script>
+{% endblock %}
