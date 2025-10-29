@@ -1,5 +1,24 @@
 from django.contrib import admin
-from .models import Category, AudioContent, Collection
+from .models import Category, AudioContent, Collection, UserProfile
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ['user', 'is_premium', 'membership_started', 'membership_expires', 'created_at']
+    list_filter = ['is_premium', 'created_at']
+    search_fields = ['user__username', 'user__email']
+    readonly_fields = ['created_at', 'updated_at']
+    fieldsets = (
+        ('사용자 정보', {
+            'fields': ('user',)
+        }),
+        ('멤버십 정보', {
+            'fields': ('is_premium', 'membership_started', 'membership_expires')
+        }),
+        ('타임스탬프', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):

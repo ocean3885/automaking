@@ -1,0 +1,59 @@
+#!/bin/bash
+# ============================================================================
+# Django 애플리케이션 업데이트 스크립트 (재배포용)
+# 실행: bash 03_update_app.sh
+# ============================================================================
+
+set -e  # 에러 발생 시 스크립트 중단
+
+# 환경 변수
+PROJECT_DIR="/var/www/automaking"
+VENV_DIR="$PROJECT_DIR/venv"
+
+echo "=================================="
+echo "애플리케이션 업데이트 시작"
+echo "=================================="
+
+# 1. Git 업데이트
+echo "[1/6] Git 저장소 업데이트..."
+cd "$PROJECT_DIR"
+git pull origin main
+
+# 2. 가상환경 활성화
+echo "[2/6] 가상환경 활성화..."
+source "$VENV_DIR/bin/activate"
+
+# 3. 패키지 업데이트
+echo "[3/6] Python 패키지 업데이트..."
+pip install -r "$PROJECT_DIR/requirements.txt" --upgrade
+
+# 4. 마이그레이션
+echo "[4/6] 데이터베이스 마이그레이션..."
+python "$PROJECT_DIR/manage.py" migrate --settings=automaking.settings.production --noinput
+
+# 5. 정적 파일 수집
+echo "[5/6] 정적 파일 수집..."
+python "$PROJECT_DIR/manage.py" collectstatic --settings=automaking.settings.production --noinput
+
+# 6. 서비스 재시작
+echo "[6/6] Gunicorn 재시작..."
+sudo systemctl restart gunicorn
+
+# 상태 확인
+sleep 2
+if sudo systemctl is-active --quiet gunicorn; then
+    echo "=================================="
+    echo "✅ 업데이트 완료!"
+    echo "=================================="
+    echo ""
+    echo "서비스 상태:"
+    sudo systemctl status gunicorn --no-pager -l
+else
+    echo "=================================="
+    echo "❌ Gunicorn 재시작 실패!"
+    echo "=================================="
+    echo ""
+    echo "로그 확인:"
+    echo "  sudo journalctl -u gunicorn -n 50"
+    exit 1
+fi

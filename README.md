@@ -252,3 +252,52 @@ gunicorn automaking.wsgi:application --bind 0.0.0.0:8000
 - [ ] CSRF/XSS 보호 활성화
 - [ ] HSTS 설정 확인
 
+## 🚀 EC2 배포
+
+빈 EC2 인스턴스에 배포하는 방법은 [deployment/QUICKSTART.md](deployment/QUICKSTART.md)를 참고하세요.
+
+### 빠른 배포 (5단계)
+
+1. **초기 설정** (root 권한)
+   ```bash
+   git clone https://github.com/ocean3885/automaking.git
+   cd automaking
+   sudo bash deployment/01_initial_setup.sh
+   ```
+
+2. **환경 변수 설정**
+   ```bash
+   cp deployment/.env.production.template .env.production
+   nano .env.production  # 필수 설정 입력
+   ```
+
+3. **애플리케이션 배포**
+   ```bash
+   bash deployment/02_deploy_app.sh
+   ```
+
+4. **서비스 시작**
+   ```bash
+   sudo systemctl start gunicorn
+   sudo systemctl enable gunicorn
+   sudo systemctl restart nginx
+   ```
+
+5. **관리자 계정 생성**
+   ```bash
+   cd /var/www/automaking
+   source /var/www/automaking/venv/bin/activate
+   python manage.py createsuperuser --settings=automaking.settings.production
+   ```
+
+### 재배포 (업데이트)
+```bash
+cd /var/www/automaking
+bash deployment/03_update_app.sh
+```
+
+상세한 배포 가이드:
+- 📖 [빠른 시작 가이드](deployment/QUICKSTART.md)
+- 📚 [상세 배포 가이드](deployment/DEPLOYMENT_GUIDE.md)
+
+---

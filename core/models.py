@@ -2,6 +2,29 @@ from django.db import models
 from django.contrib.auth.models import User
 import os
 
+# User 모델 확장: 멤버십 정보 추가
+class UserProfile(models.Model):
+    """사용자 프로필 - 멤버십 정보"""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    is_premium = models.BooleanField(default=False, verbose_name='프리미엄 멤버십')
+    membership_started = models.DateTimeField(null=True, blank=True)
+    membership_expires = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {'Premium' if self.is_premium else 'Free'}"
+
+    @property
+    def can_upload(self):
+        """업로드 권한 확인 (프리미엄 멤버만)"""
+        return self.is_premium
+
+    class Meta:
+        verbose_name = "사용자 프로필"
+        verbose_name_plural = "사용자 프로필"
+
+
 class Category(models.Model):
     name = models.CharField(max_length=50, unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -48,10 +71,19 @@ class AudioContent(models.Model):
         return f"{self.title} ({self.user.username})"
 
     def delete(self, *args, **kwargs):
-        # 파일이 존재하면 물리적 파일도 삭제
+        """
+        오디오 파일 삭제 시 연결된 파일도 함께 삭제합니다.
+        로컬 파일 시스템과 S3 호환 스토리지 모두 지원합니다.
+        """
         if self.audio_file:
-            if os.path.isfile(self.audio_file.path):
-                os.remove(self.audio_file.path)
+            try:
+                # Django storage를 통해 삭제 (로컬/S3 모두 지원)
+                self.audio_file.delete(save=False)
+            except Exception as e:
+                # 파일 삭제 실패 시 로깅 (선택사항)
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to delete audio file: {e}")
         super().delete(*args, **kwargs)
 
     class Meta:

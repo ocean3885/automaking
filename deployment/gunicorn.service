@@ -1,0 +1,36 @@
+[Unit]
+Description=Gunicorn daemon for Automaking Django Application
+After=network.target
+
+[Service]
+Type=notify
+User=ubuntu
+Group=www-data
+WorkingDirectory=/var/www/automaking
+Environment="PATH=/var/www/automaking/venv/bin"
+Environment="DJANGO_SETTINGS_MODULE=automaking.settings.production"
+
+# .env.production 파일 로드
+EnvironmentFile=/var/www/automaking/.env.production
+
+# Gunicorn 실행
+ExecStart=/var/www/automaking/venv/bin/gunicorn \
+    --workers 3 \
+    --bind unix:/var/www/automaking/gunicorn.sock \
+    --access-logfile /var/www/automaking/logs/gunicorn-access.log \
+    --error-logfile /var/www/automaking/logs/gunicorn-error.log \
+    --log-level info \
+    --timeout 120 \
+    automaking.wsgi:application
+
+# 재시작 정책
+Restart=on-failure
+RestartSec=5s
+
+# 프로세스 제한
+KillMode=mixed
+KillSignal=SIGQUIT
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target

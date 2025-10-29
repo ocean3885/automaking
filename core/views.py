@@ -25,6 +25,7 @@ from django.contrib.auth.models import User
 from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse
 from .models import AudioContent, Category, Collection
+from .decorators import premium_required, owner_or_premium_required
 
 # Gemini AI 관련
 import google.generativeai as genai
@@ -95,18 +96,22 @@ LANG_CONFIG = {
 }
 
 @login_required
+@premium_required
 def upload_file_view(request):
-    """파일 업로드 폼을 표시합니다."""
+    """파일 업로드 폼을 표시합니다. (프리미엄 멤버 전용)"""
     # 템플릿은 중앙 templates 폴더에서 'core/upload_form.html'로 찾습니다.
     categories = Category.objects.all()
     return render(request, 'core/upload_form.html', {'categories': categories}) 
 
+@login_required
+@premium_required
 def process_file_view(request):
     """
     업로드된 TXT 파일을 처리하여,
     1. 원문 3회 반복 오디오를 생성하고,
     2. 각 문장의 재생 시간 정보(타임스탬프)를 계산한 뒤,
     3. 오디오 플레이어 페이지로 데이터를 전달하여 렌더링합니다.
+    (프리미엄 멤버 전용)
     """
     if request.method != 'POST':
         return HttpResponseRedirect(reverse('upload'))
@@ -358,7 +363,9 @@ def add_category(request):
 
 
 @login_required
+@owner_or_premium_required
 def delete_audio(request, audio_id):
+    """오디오 삭제 (본인 게시물만 가능)"""
     audio = get_object_or_404(AudioContent, id=audio_id, user=request.user)
     if request.method == 'POST':
         audio.delete()
@@ -367,8 +374,9 @@ def delete_audio(request, audio_id):
 
 
 @login_required
+@owner_or_premium_required
 def update_audio(request, audio_id):
-    """오디오 제목과 카테고리를 업데이트합니다."""
+    """오디오 제목과 카테고리를 업데이트합니다. (본인 게시물만 가능)"""
     audio = get_object_or_404(AudioContent, id=audio_id, user=request.user)
     
     if request.method != 'POST':
@@ -413,8 +421,9 @@ def update_audio(request, audio_id):
 
 
 @login_required
+@premium_required
 def generate_sentences_view(request):
-    """Gemini AI를 사용하여 학습용 문장을 생성합니다."""
+    """Gemini AI를 사용하여 학습용 문장을 생성합니다. (프리미엄 멤버 전용)"""
     if request.method != 'POST':
         return HttpResponseRedirect(reverse('upload'))
     
