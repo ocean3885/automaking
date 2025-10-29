@@ -4,37 +4,41 @@ Django base settings for automaking project.
 """
 from pathlib import Path
 import os
-import json
+from decouple import config, Csv
 from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 # -----------------------------------------------------------
-# Secret.json 파일에서 설정 불러오기
+# 환경 변수 로드 (.env 파일)
 # -----------------------------------------------------------
 
-secret_file = BASE_DIR / 'secret.json'
-
-if not os.path.exists(secret_file):
-    raise ImproperlyConfigured(f"'{secret_file}' 파일이 프로젝트 루트에 필요합니다.")
-
-with open(secret_file) as f:
-    secrets = json.loads(f.read())
-
-def get_secret(setting, secrets_dict=secrets):
-    """secrets 딕셔너리에서 특정 키를 가져오는 함수"""
-    try:
-        return secrets_dict[setting]
-    except KeyError:
-        error_msg = f"'{setting}' 키가 secret.json 파일에 없습니다."
-        raise ImproperlyConfigured(error_msg)
-
 # SECRET_KEY
-SECRET_KEY = get_secret("SECRET_KEY")
+SECRET_KEY = config('SECRET_KEY')
 
-# TTS 관련 설정
-GOOGLE_CLOUD_CREDENTIALS_JSON = get_secret("GOOGLE_CLOUD_CREDENTIALS")
+# Google Cloud TTS 설정 (환경 변수에서 로드)
+def get_google_cloud_credentials():
+    """Google Cloud 서비스 계정 credentials를 환경 변수에서 가져오기"""
+    try:
+        credentials = {
+            "type": "service_account",
+            "project_id": config('GOOGLE_CLOUD_PROJECT_ID'),
+            "private_key_id": config('GOOGLE_CLOUD_PRIVATE_KEY_ID'),
+            "private_key": config('GOOGLE_CLOUD_PRIVATE_KEY').replace('\\n', '\n'),
+            "client_email": config('GOOGLE_CLOUD_CLIENT_EMAIL'),
+            "client_id": config('GOOGLE_CLOUD_CLIENT_ID'),
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": config('GOOGLE_CLOUD_CLIENT_CERT_URL'),
+            "universe_domain": "googleapis.com"
+        }
+        return credentials
+    except Exception as e:
+        raise ImproperlyConfigured(f"Google Cloud credentials 환경 변수가 올바르지 않습니다: {e}")
+
+GOOGLE_CLOUD_CREDENTIALS_JSON = get_google_cloud_credentials()
 
 # Application definition
 INSTALLED_APPS = [

@@ -58,6 +58,7 @@ media/
 # Secret files
 secret.json
 .env
+.env.production
 
 # Settings backup
 automaking/settings.py.backup

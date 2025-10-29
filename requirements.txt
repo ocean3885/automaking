@@ -18,8 +18,10 @@ grpcio-status==1.71.2
 httplib2==0.31.0
 idna==3.11
 proto-plus==1.26.1
-protobuf==5.29.5
+protobuf==5.29.3
+psycopg2-binary==2.9.10
 pyasn1==0.6.1
+python-decouple==3.8
 pyasn1_modules==0.4.2
 pydantic==2.12.3
 pydantic_core==2.41.4

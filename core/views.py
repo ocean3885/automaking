@@ -7,7 +7,7 @@ from django.shortcuts import render
 from django.http import HttpResponse, HttpResponseRedirect, FileResponse
 from django.urls import reverse
 from django.conf import settings
-from automaking.settings.base import get_secret
+from decouple import config
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.contrib.auth.decorators import login_required
 
@@ -437,7 +437,7 @@ def generate_sentences_view(request):
     
     try:
         # Gemini API 초기화
-        gemini_api_key = get_secret("GEMINI_API_KEY")
+        gemini_api_key = config('GEMINI_API_KEY')
         genai.configure(api_key=gemini_api_key)
         model = genai.GenerativeModel('gemini-2.5-flash')
         
