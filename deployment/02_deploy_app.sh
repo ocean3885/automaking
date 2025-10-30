@@ -131,18 +131,22 @@ echo "[8/12] 정적 파일 수집..."
 python "$PROJECT_DIR/manage.py" collectstatic --settings=automaking.settings.production --noinput
 
 # 9. 권한 설정
-echo "[9/12] 파일 권한 설정..."
+echo "[9/10] 파일 권한 설정..."
 sudo chown -R ubuntu:www-data "$PROJECT_DIR"
 sudo chmod -R 755 "$PROJECT_DIR"
 sudo chmod -R 775 "$PROJECT_DIR/logs"
 sudo chmod -R 775 "$PROJECT_DIR/media"
 
 # 10. Gunicorn 및 Nginx 설정 복사
-echo "[10/12] 서비스 설정 파일 복사..."
+echo "[10/10] 서비스 설정 파일 복사..."
 sudo cp "$PROJECT_DIR/deployment/gunicorn.service" /etc/systemd/system/
 sudo cp "$PROJECT_DIR/deployment/nginx.conf" /etc/nginx/sites-available/automaking
 sudo ln -sf /etc/nginx/sites-available/automaking /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
+
+# Certbot 디렉토리 생성
+sudo mkdir -p /var/www/certbot
+sudo chown -R ubuntu:www-data /var/www/certbot
 
 # Nginx 설정 테스트
 echo "Nginx 설정 테스트..."
@@ -208,6 +212,10 @@ echo "관리자 계정 생성 (선택사항):"
 echo "  cd $PROJECT_DIR"
 echo "  source $VENV_DIR/bin/activate"
 echo "  python manage.py createsuperuser --settings=automaking.settings.production"
+echo ""
+echo "SSL 인증서 발급 (도메인 보유 시):"
+echo "  sudo apt-get install -y certbot python3-certbot-nginx"
+echo "  sudo certbot --nginx -d your-domain.com"
 echo ""
 echo "로그 확인:"
 echo "  sudo journalctl -u gunicorn -f"
