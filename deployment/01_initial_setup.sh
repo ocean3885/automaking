@@ -40,15 +40,8 @@ apt-get install -y \
 echo "[3/7] FFmpeg 설치..."
 apt-get install -y ffmpeg
 
-# 4. 프로젝트 디렉토리 생성
-echo "[4/7] 프로젝트 디렉토리 생성..."
-mkdir -p /var/www/automaking
-mkdir -p /var/www/automaking/logs
-mkdir -p /var/www/automaking/static
-mkdir -p /var/www/automaking/media
-
-# 5. 배포 사용자 생성 (이미 있으면 스킵)
-echo "[5/7] 배포 사용자 확인..."
+# 4. 배포 사용자 생성 (이미 있으면 스킵)
+echo "[4/6] 배포 사용자 확인..."
 if ! id "ubuntu" &>/dev/null; then
     useradd -m -s /bin/bash ubuntu
     echo "ubuntu ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/ubuntu
@@ -57,23 +50,22 @@ else
     echo "사용자 'ubuntu' 이미 존재"
 fi
 
-# 6. 디렉토리 권한 설정
-echo "[6/7] 디렉토리 권한 설정..."
-chown -R ubuntu:ubuntu /var/www/automaking
-chmod -R 755 /var/www/automaking
-
-# 7. 방화벽 설정 (UFW)
-echo "[7/7] 방화벽 설정..."
+# 5. 방화벽 설정 (UFW)
+echo "[5/6] 방화벽 설정..."
 ufw allow 22/tcp    # SSH
 ufw allow 80/tcp    # HTTP
 ufw allow 443/tcp   # HTTPS
 ufw --force enable
+
+# 6. Git 전역 설정 (선택사항)
+echo "[6/6] Git 기본 설정..."
+git config --global init.defaultBranch main || true
 
 echo "=================================="
 echo "초기 설정 완료!"
 echo "=================================="
 echo ""
 echo "다음 단계:"
-echo "1. 프로젝트 저장소 클론: git clone https://github.com/ocean3885/automaking.git /var/www/automaking"
-echo "2. 배포 스크립트 실행: cd /var/www/automaking && bash deployment/02_deploy_app.sh"
+echo "1. 배포 스크립트 실행: bash deployment/02_deploy_app.sh"
+echo "   (스크립트가 자동으로 /var/www/automaking에 저장소를 클론하고 폴더/권한을 설정합니다)"
 echo ""

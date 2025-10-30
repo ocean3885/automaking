@@ -24,27 +24,42 @@ echo "Django 애플리케이션 배포 시작"
 echo "=================================="
 
 # 1. Git 저장소 클론 또는 업데이트
-echo "[1/10] Git 저장소 클론/업데이트..."
+echo "[1/12] Git 저장소 클론/업데이트..."
 if [ -d "$PROJECT_DIR/.git" ]; then
     echo "기존 저장소 업데이트..."
     cd "$PROJECT_DIR"
     git pull origin main
 else
     echo "새로운 저장소 클론..."
-    # 프로젝트 디렉토리가 비어있지 않으면 임시 디렉토리 사용
-    if [ -z "$(ls -A $PROJECT_DIR)" ]; then
+    # /var/www 디렉토리 생성 (없을 경우)
+    sudo mkdir -p /var/www
+    
+    # 프로젝트 디렉토리가 존재하지 않으면 바로 클론
+    if [ ! -d "$PROJECT_DIR" ]; then
         git clone "$GITHUB_REPO" "$PROJECT_DIR"
+    # 디렉토리가 비어있으면 클론 가능
+    elif [ -z "$(ls -A $PROJECT_DIR 2>/dev/null)" ]; then
+        git clone "$GITHUB_REPO" "$PROJECT_DIR"
+    # 비어있지 않으면 임시 디렉토리 사용
     else
+        echo "  ⚠️  $PROJECT_DIR가 비어있지 않아 임시 디렉토리를 사용합니다..."
         TEMP_DIR=$(mktemp -d)
         git clone "$GITHUB_REPO" "$TEMP_DIR"
-        cp -r "$TEMP_DIR"/* "$PROJECT_DIR"/
-        rm -rf "$TEMP_DIR"
+        sudo cp -r "$TEMP_DIR"/* "$PROJECT_DIR"/
+        sudo rm -rf "$TEMP_DIR"
     fi
     cd "$PROJECT_DIR"
 fi
 
+# 1.5. 필수 하위 디렉토리 생성
+echo "[1.5/12] 프로젝트 하위 디렉토리 생성..."
+sudo mkdir -p "$PROJECT_DIR/logs"
+sudo mkdir -p "$PROJECT_DIR/media"
+sudo mkdir -p "$PROJECT_DIR/static"
+echo "✅ logs, media, static 디렉토리 생성 완료"
+
 # 2. Python 가상환경 생성
-echo "[2/10] Python 가상환경 설정..."
+echo "[2/12] Python 가상환경 설정..."
 if [ ! -d "$VENV_DIR" ]; then
     python3.12 -m venv "$VENV_DIR"
     echo "가상환경 생성 완료"
@@ -53,17 +68,17 @@ else
 fi
 
 # 3. 가상환경 활성화 및 pip 업그레이드
-echo "[3/10] pip 업그레이드..."
+echo "[3/12] pip 업그레이드..."
 source "$VENV_DIR/bin/activate"
 pip install --upgrade pip setuptools wheel
 
 # 4. Python 패키지 설치
-echo "[4/10] Python 패키지 설치..."
+echo "[4/12] Python 패키지 설치..."
 pip install -r "$PROJECT_DIR/requirements.txt"
 pip install gunicorn
 
 # 5. .env.production 파일 확인
-echo "[5/10] 환경 변수 파일 확인..."
+echo "[5/12] 환경 변수 파일 확인..."
 if [ ! -f "$PROJECT_DIR/.env.production" ]; then
     echo "⚠️  경고: .env.production 파일이 없습니다!"
     echo "📝 템플릿 파일 생성 중..."
@@ -84,43 +99,40 @@ else
     echo "✅ .env.production 파일 존재"
 fi
 
-# 5.5 .env.production 파일 로드 (Django 명령 실행을 위해)
-echo "[5.5/10] 환경 변수 로드..."
-# dotenv 파일 로드를 위한 패키지가 설치되어 있다면 사용 (예: python-dotenv)
-# 하지만 배포 스크립트에서는 'export' 형태로 직접 로드하는 것이 가장 안정적입니다.
+# 5.5 환경 변수 로드 (Django 명령 실행을 위해)
+echo "[5.5/12] 환경 변수 로드..."
 if [ -f "$PROJECT_DIR/.env.production" ]; then
-    # 주석과 빈 줄을 제외하고 'export KEY=VALUE' 형식으로 셸에 로드
-    grep -vE '^\s*#' "$PROJECT_DIR/.env.production" | grep -E '^\s*[A-Z_]+=' | while IFS= read -r line; do
-        export "$line"
-    done
+    # .env.production의 환경 변수를 현재 쉘에 export
+    set -a  # 모든 변수를 자동으로 export
+    source "$PROJECT_DIR/.env.production"
+    set +a  # auto export 해제
     echo "✅ 환경 변수 로드 완료"
 else
-    # 5번 단계에서 이미 확인했으므로 여기서는 간단히 처리
-    echo "⚠️  .env.production 파일을 찾을 수 없어 환경 변수를 로드하지 못했습니다."
+    echo "⚠️  .env.production 파일을 찾을 수 없어 환경 변수를 로드하지 못했습니다."
 fi
 
 # 6. Django 설정 확인
-echo "[6/10] Django 설정 확인..."
+echo "[6/12] Django 설정 확인..."
 export DJANGO_SETTINGS_MODULE=automaking.settings.production
 python "$PROJECT_DIR/manage.py" check --settings=automaking.settings.production
 
 # 7. 데이터베이스 마이그레이션
-echo "[7/10] 데이터베이스 마이그레이션..."
+echo "[7/12] 데이터베이스 마이그레이션..."
 python "$PROJECT_DIR/manage.py" migrate --settings=automaking.settings.production --noinput
 
 # 8. 정적 파일 수집
-echo "[8/10] 정적 파일 수집..."
+echo "[8/12] 정적 파일 수집..."
 python "$PROJECT_DIR/manage.py" collectstatic --settings=automaking.settings.production --noinput
 
 # 9. 권한 설정
-echo "[9/10] 파일 권한 설정..."
+echo "[9/12] 파일 권한 설정..."
 sudo chown -R ubuntu:www-data "$PROJECT_DIR"
 sudo chmod -R 755 "$PROJECT_DIR"
 sudo chmod -R 775 "$PROJECT_DIR/logs"
 sudo chmod -R 775 "$PROJECT_DIR/media"
 
 # 10. Gunicorn 및 Nginx 설정 복사
-echo "[10/10] 서비스 설정 파일 복사..."
+echo "[10/12] 서비스 설정 파일 복사..."
 sudo cp "$PROJECT_DIR/deployment/gunicorn.service" /etc/systemd/system/
 sudo cp "$PROJECT_DIR/deployment/nginx.conf" /etc/nginx/sites-available/automaking
 sudo ln -sf /etc/nginx/sites-available/automaking /etc/nginx/sites-enabled/

@@ -14,24 +14,44 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # 환경 변수 로드 (.env 파일)
 # -----------------------------------------------------------
 
-# SECRET_KEY
-SECRET_KEY = config('SECRET_KEY')
+# SECRET_KEY - 환경 변수에서 직접 로드 (배포 시 일관성 유지)
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    # 개발 환경에서는 decouple 사용 (로컬에서 .env 파일 사용)
+    try:
+        SECRET_KEY = config('SECRET_KEY')
+    except Exception:
+        raise ImproperlyConfigured("SECRET_KEY 환경 변수를 설정해주세요.")
 
 # Google Cloud TTS 설정 (환경 변수에서 로드)
 def get_google_cloud_credentials():
     """Google Cloud 서비스 계정 credentials를 환경 변수에서 가져오기"""
     try:
+        # 환경 변수에서 직접 가져오기 시도 (배포 환경)
+        project_id = os.environ.get('GOOGLE_CLOUD_PROJECT_ID')
+        if not project_id:
+            # 개발 환경에서는 decouple 사용
+            project_id = config('GOOGLE_CLOUD_PROJECT_ID')
+            
+        private_key = os.environ.get('GOOGLE_CLOUD_PRIVATE_KEY')
+        if not private_key:
+            private_key = config('GOOGLE_CLOUD_PRIVATE_KEY')
+            
+        client_email = os.environ.get('GOOGLE_CLOUD_CLIENT_EMAIL')
+        if not client_email:
+            client_email = config('GOOGLE_CLOUD_CLIENT_EMAIL')
+            
         credentials = {
             "type": "service_account",
-            "project_id": config('GOOGLE_CLOUD_PROJECT_ID'),
-            "private_key_id": config('GOOGLE_CLOUD_PRIVATE_KEY_ID'),
-            "private_key": config('GOOGLE_CLOUD_PRIVATE_KEY').replace('\\n', '\n'),
-            "client_email": config('GOOGLE_CLOUD_CLIENT_EMAIL'),
-            "client_id": config('GOOGLE_CLOUD_CLIENT_ID'),
+            "project_id": project_id,
+            "private_key_id": os.environ.get('GOOGLE_CLOUD_PRIVATE_KEY_ID') or config('GOOGLE_CLOUD_PRIVATE_KEY_ID'),
+            "private_key": private_key.replace('\\n', '\n'),
+            "client_email": client_email,
+            "client_id": os.environ.get('GOOGLE_CLOUD_CLIENT_ID') or config('GOOGLE_CLOUD_CLIENT_ID'),
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
             "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-            "client_x509_cert_url": config('GOOGLE_CLOUD_CLIENT_CERT_URL'),
+            "client_x509_cert_url": os.environ.get('GOOGLE_CLOUD_CLIENT_CERT_URL') or config('GOOGLE_CLOUD_CLIENT_CERT_URL'),
             "universe_domain": "googleapis.com"
         }
         return credentials
