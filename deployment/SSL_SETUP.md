@@ -61,7 +61,7 @@ sudo systemctl reload nginx
 ### 4단계: SSL 인증서 발급
 
 ```bash
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+sudo certbot --nginx -d lang.ai.kr -d www.lang.ai.kr
 ```
 
 **질문에 답변:**

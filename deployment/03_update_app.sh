@@ -23,20 +23,32 @@ git pull origin main
 echo "[2/6] 가상환경 활성화..."
 source "$VENV_DIR/bin/activate"
 
-# 3. 패키지 업데이트
-echo "[3/6] Python 패키지 업데이트..."
+# 3. 환경 변수 로드
+echo "[3/6] 환경 변수 로드..."
+if [ -f "$PROJECT_DIR/.env.production" ]; then
+    set -a
+    source "$PROJECT_DIR/.env.production"
+    set +a
+    echo "✅ 환경 변수 로드 완료"
+else
+    echo "⚠️  .env.production 파일을 찾을 수 없습니다."
+fi
+
+# 4. 패키지 업데이트
+echo "[4/6] Python 패키지 업데이트..."
 pip install -r "$PROJECT_DIR/requirements.txt" --upgrade
 
-# 4. 마이그레이션
-echo "[4/6] 데이터베이스 마이그레이션..."
+# 5. 마이그레이션
+echo "[5/6] 데이터베이스 마이그레이션..."
+export DJANGO_SETTINGS_MODULE=automaking.settings.production
 python "$PROJECT_DIR/manage.py" migrate --settings=automaking.settings.production --noinput
 
-# 5. 정적 파일 수집
-echo "[5/6] 정적 파일 수집..."
+# 6. 정적 파일 수집
+echo "[6/6] 정적 파일 수집..."
 python "$PROJECT_DIR/manage.py" collectstatic --settings=automaking.settings.production --noinput
 
-# 6. 서비스 재시작
-echo "[6/6] Gunicorn 재시작..."
+# 7. 서비스 재시작
+echo "[7/7] Gunicorn 재시작..."
 sudo systemctl restart gunicorn
 
 # 상태 확인

@@ -12,7 +12,7 @@ PROJECT_DIR="/var/www/automaking"
 VENV_DIR="$PROJECT_DIR/venv"
 
 # SSL 자동 설정 기본값 (원하면 환경변수로 덮어쓸 수 있음)
-DOMAIN_DEFAULT="ec2-52-79-212-162.ap-northeast-2.compute.amazonaws.com"
+DOMAIN_DEFAULT="lang.ai.kr"
 CERTBOT_EMAIL_DEFAULT="ocean3885@gmail.com"
 
 # 외부에서 미리 설정하지 않았다면 기본값으로 설정
