@@ -16,6 +16,19 @@
 
 ## 🚀 빠른 설정 (Let's Encrypt)
 
+> 자동화 선호 시: `deployment/02_deploy_app.sh`가 Certbot 자동 발급을 지원합니다. 아래 환경변수만 지정하고 스크립트를 실행하세요.
+>
+> - DOMAIN: 발급할 도메인 (예: ec2-52-79-212-162.ap-northeast-2.compute.amazonaws.com)
+> - CERTBOT_EMAIL: 인증서 만료 알림용 이메일
+>
+> 예시:
+> ```bash
+> export DOMAIN=ec2-52-79-212-162.ap-northeast-2.compute.amazonaws.com
+> export CERTBOT_EMAIL=you@example.com
+> bash deployment/02_deploy_app.sh
+> ```
+> 스크립트는 certbot 설치 → nginx 테스트/리로드 → 인증서 발급/리다이렉트 설정 → 갱신 드라이런까지 자동 수행합니다.
+
 ### 1단계: Certbot 설치
 
 ```bash

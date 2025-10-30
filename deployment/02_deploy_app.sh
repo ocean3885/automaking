@@ -11,6 +11,14 @@ GITHUB_REPO="https://github.com/ocean3885/automaking.git"
 PROJECT_DIR="/var/www/automaking"
 VENV_DIR="$PROJECT_DIR/venv"
 
+# SSL 자동 설정 기본값 (원하면 환경변수로 덮어쓸 수 있음)
+DOMAIN_DEFAULT="ec2-52-79-212-162.ap-northeast-2.compute.amazonaws.com"
+CERTBOT_EMAIL_DEFAULT="ocean3885@gmail.com"
+
+# 외부에서 미리 설정하지 않았다면 기본값으로 설정
+export DOMAIN="${DOMAIN:-$DOMAIN_DEFAULT}"
+export CERTBOT_EMAIL="${CERTBOT_EMAIL:-$CERTBOT_EMAIL_DEFAULT}"
+
 echo "=================================="
 echo "Django 애플리케이션 배포 시작"
 echo "=================================="
@@ -107,6 +115,52 @@ sudo rm -f /etc/nginx/sites-enabled/default
 echo "Nginx 설정 테스트..."
 sudo nginx -t
 
+echo "[11/12] Certbot 및 SSL 설정 (옵션)..."
+echo "  - DOMAIN=${DOMAIN} (환경변수로 덮어쓰기 가능)"
+echo "  - CERTBOT_EMAIL=${CERTBOT_EMAIL} (환경변수로 덮어쓰기 가능)"
+
+# 도메인과 이메일은 환경 변수 또는 .env.production에서 읽을 수 있습니다
+# 우선순위: 스크립트 환경변수 > .env.production 값
+
+DOMAIN_ENV="${DOMAIN:-}"
+EMAIL_ENV="${CERTBOT_EMAIL:-}"
+
+# .env.production에서 ALLOWED_HOSTS 첫 번째 값을 도메인으로 추출 (콤마 구분)
+if [ -z "$DOMAIN_ENV" ] && [ -f "$PROJECT_DIR/.env.production" ]; then
+    DOMAIN_ENV=$(grep -E '^ALLOWED_HOSTS=' "$PROJECT_DIR/.env.production" | sed 's/ALLOWED_HOSTS=//' | cut -d',' -f1)
+fi
+
+if [ -n "$DOMAIN_ENV" ] && [ -n "$EMAIL_ENV" ]; then
+    echo "도메인: $DOMAIN_ENV"
+    echo "인증서 이메일: $EMAIL_ENV"
+    echo "Certbot 설치 및 인증서 발급을 시도합니다..."
+
+    # Certbot 설치 (Ubuntu/Debian)
+    if ! command -v certbot >/dev/null 2>&1; then
+        echo "certbot이 없어 설치합니다..."
+        sudo apt-get update
+        sudo apt-get install -y certbot python3-certbot-nginx
+    fi
+
+    # 방화벽(UFW) 사용 시 Nginx Full 허용 (무시 가능)
+    if command -v ufw >/dev/null 2>&1; then
+        sudo ufw allow 'Nginx Full' || true
+    fi
+
+    # Nginx 설정 테스트 후 Certbot으로 인증서 발급
+    sudo nginx -t && sudo systemctl reload nginx
+    sudo certbot --nginx -d "$DOMAIN_ENV" --agree-tos -m "$EMAIL_ENV" --non-interactive --redirect || {
+        echo "⚠️  Certbot 발급 실패. SSL은 수동으로 설정해야 할 수 있습니다."
+    }
+
+    # 자동 갱신 테스트
+    sudo certbot renew --dry-run || true
+else
+    echo "⚠️  SSL 자동 설정 건너뜀: DOMAIN 또는 CERTBOT_EMAIL이 설정되지 않았습니다."
+    echo "    DOMAIN 환경변수 또는 .env.production의 ALLOWED_HOSTS 첫 값, 그리고 CERTBOT_EMAIL을 설정하면 자동으로 인증서를 발급합니다."
+fi
+
+echo "[12/12] 요약 및 다음 단계"
 echo "=================================="
 echo "배포 완료!"
 echo "=================================="
