@@ -51,8 +51,8 @@ def guess_endpoint(env):
 
 def resolve_config(env):
     cfg = {}
-    cfg["AWS_ACCESS_KEY_ID"] = os.environ.get("AWS_ACCESS_KEY_ID") or env.get("AWS_ACCESS_KEY_ID")
-    cfg["AWS_SECRET_ACCESS_KEY"] = os.environ.get("AWS_SECRET_ACCESS_KEY") or env.get("AWS_SECRET_ACCESS_KEY")
+    cfg["AWS_ACCESS_KEY_ID"] = os.environ.get("AWS_S3_ACCESS_KEY_ID") or env.get("AWS_S3_ACCESS_KEY_ID")
+    cfg["AWS_SECRET_ACCESS_KEY"] = os.environ.get("AWS_S3_SECRET_ACCESS_KEY") or env.get("AWS_S3_SECRET_ACCESS_KEY")
     cfg["AWS_S3_ENDPOINT_URL"] = guess_endpoint(env)
     cfg["AWS_S3_REGION_NAME"] = os.environ.get("AWS_S3_REGION_NAME") or env.get("AWS_S3_REGION_NAME") or "us-east-1"
     cfg["BUCKET"] = (
