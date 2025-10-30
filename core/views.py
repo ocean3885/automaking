@@ -31,7 +31,8 @@ from .decorators import premium_required, owner_or_premium_required
 # Gemini AI 관련
 import google.generativeai as genai
 
-AudioSegment.converter = which("ffmpeg")
+AudioSegment.converter = which("ffmpeg") or "/usr/bin/ffmpeg"
+AudioSegment.ffprobe   = which("ffprobe") or "/usr/bin/ffprobe"
 
 def home(request):
     """홈 페이지를 표시합니다. 카테고리별 최신 게시물을 보여줍니다."""
