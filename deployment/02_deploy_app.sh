@@ -84,6 +84,21 @@ else
     echo "✅ .env.production 파일 존재"
 fi
 
+# 5.5 .env.production 파일 로드 (Django 명령 실행을 위해)
+echo "[5.5/10] 환경 변수 로드..."
+# dotenv 파일 로드를 위한 패키지가 설치되어 있다면 사용 (예: python-dotenv)
+# 하지만 배포 스크립트에서는 'export' 형태로 직접 로드하는 것이 가장 안정적입니다.
+if [ -f "$PROJECT_DIR/.env.production" ]; then
+    # 주석과 빈 줄을 제외하고 'export KEY=VALUE' 형식으로 셸에 로드
+    grep -vE '^\s*#' "$PROJECT_DIR/.env.production" | grep -E '^\s*[A-Z_]+=' | while IFS= read -r line; do
+        export "$line"
+    done
+    echo "✅ 환경 변수 로드 완료"
+else
+    # 5번 단계에서 이미 확인했으므로 여기서는 간단히 처리
+    echo "⚠️  .env.production 파일을 찾을 수 없어 환경 변수를 로드하지 못했습니다."
+fi
+
 # 6. Django 설정 확인
 echo "[6/10] Django 설정 확인..."
 export DJANGO_SETTINGS_MODULE=automaking.settings.production
