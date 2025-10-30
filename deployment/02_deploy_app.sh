@@ -36,16 +36,20 @@ else
     
     # 프로젝트 디렉토리가 존재하지 않으면 바로 클론
     if [ ! -d "$PROJECT_DIR" ]; then
-        git clone "$GITHUB_REPO" "$PROJECT_DIR"
+        sudo git clone "$GITHUB_REPO" "$PROJECT_DIR"
+        # 클론 후 즉시 소유자 변경
+        sudo chown -R ubuntu:ubuntu "$PROJECT_DIR"
     # 디렉토리가 비어있으면 클론 가능
     elif [ -z "$(ls -A $PROJECT_DIR 2>/dev/null)" ]; then
-        git clone "$GITHUB_REPO" "$PROJECT_DIR"
+        sudo git clone "$GITHUB_REPO" "$PROJECT_DIR"
+        sudo chown -R ubuntu:ubuntu "$PROJECT_DIR"
     # 비어있지 않으면 임시 디렉토리 사용
     else
         echo "  ⚠️  $PROJECT_DIR가 비어있지 않아 임시 디렉토리를 사용합니다..."
         TEMP_DIR=$(mktemp -d)
         git clone "$GITHUB_REPO" "$TEMP_DIR"
         sudo cp -r "$TEMP_DIR"/* "$PROJECT_DIR"/
+        sudo chown -R ubuntu:ubuntu "$PROJECT_DIR"
         sudo rm -rf "$TEMP_DIR"
     fi
     cd "$PROJECT_DIR"
@@ -56,7 +60,9 @@ echo "[1.5/12] 프로젝트 하위 디렉토리 생성..."
 sudo mkdir -p "$PROJECT_DIR/logs"
 sudo mkdir -p "$PROJECT_DIR/media"
 sudo mkdir -p "$PROJECT_DIR/static"
-echo "✅ logs, media, static 디렉토리 생성 완료"
+# 생성된 디렉토리 소유자 변경
+sudo chown -R ubuntu:ubuntu "$PROJECT_DIR/logs" "$PROJECT_DIR/media" "$PROJECT_DIR/static"
+echo "✅ logs, media, static 디렉토리 생성 및 권한 설정 완료"
 
 # 2. Python 가상환경 생성
 echo "[2/12] Python 가상환경 설정..."
