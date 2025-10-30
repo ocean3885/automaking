@@ -17,6 +17,7 @@ from google.oauth2.service_account import Credentials
 from django.core.exceptions import ImproperlyConfigured
 from .utils import get_tts_client, get_voice_config, generate_tts_audio
 from pydub import AudioSegment
+from pydub.utils import which
 import logging
 logger = logging.getLogger(__name__)
 from django.utils.text import slugify
@@ -29,6 +30,8 @@ from .decorators import premium_required, owner_or_premium_required
 
 # Gemini AI 관련
 import google.generativeai as genai
+
+AudioSegment.converter = which("ffmpeg")
 
 def home(request):
     """홈 페이지를 표시합니다. 카테고리별 최신 게시물을 보여줍니다."""
