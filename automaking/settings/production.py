@@ -59,6 +59,9 @@ if USE_S3_STORAGE:
     SUPABASE_URL = os.environ.get('SUPABASE_URL')
     SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
     
+    # 환경별 폴더 prefix - 프로덕션은 'production/' 폴더에 저장
+    STORAGE_ENVIRONMENT_PREFIX = 'production'
+    
     # 커스텀 Storage 백엔드 사용
     DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabasePrivateStorage'
     

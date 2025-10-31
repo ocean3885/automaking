@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.conf import settings
 import os
 
 # User 모델 확장: 멤버십 정보 추가
@@ -60,7 +61,16 @@ class AudioContent(models.Model):
     original_text = models.TextField()
     translated_text = models.TextField()
     audio_data = models.TextField()  # Base64로 인코딩된 오디오 데이터
-    audio_file = models.FileField(upload_to='audios/', null=True, blank=True)
+    # 환경에 따라 다른 스토리지 사용 (Supabase Storage or Local)
+    # settings.USE_S3_STORAGE=True면 Supabase Storage를 사용하도록 강제
+    try:
+        from .storage_backends import SupabasePrivateStorage
+    except Exception:
+        SupabasePrivateStorage = None
+
+    _storage_backend = SupabasePrivateStorage() if getattr(settings, 'USE_S3_STORAGE', False) and SupabasePrivateStorage else None
+
+    audio_file = models.FileField(upload_to='audios/', storage=_storage_backend, null=True, blank=True)
     sync_data = models.TextField(null=True, blank=True)  # JSON 문자열으로 저장된 타임스탬프 데이터
     view_count = models.IntegerField(default=0)  # 조회수
     collections = models.ManyToManyField(Collection, related_name='audio_contents', blank=True)  # 보관함 다대다 관계

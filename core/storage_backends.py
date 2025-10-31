@@ -1,24 +1,53 @@
 """
 Supabase Storage용 커스텀 Storage 백엔드
 프라이빗 버킷에서 Signed URL을 생성합니다.
+환경별로 다른 폴더에 파일을 저장합니다 (local/ 또는 production/).
 """
 from storages.backends.s3boto3 import S3Boto3Storage
 from django.conf import settings
 import requests
 import json
 from datetime import datetime, timedelta
+import os
 
 
 class SupabasePrivateStorage(S3Boto3Storage):
     """
     Supabase 프라이빗 버킷용 Storage 백엔드
     django-storages의 S3Boto3Storage를 상속받아 파일 업로드/삭제는 S3 호환 API 사용
+    환경별로 다른 폴더에 저장: local/ 또는 production/
     """
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.querystring_auth = True
         self.default_acl = None
+        
+        # 환경별 폴더 prefix 설정
+        self.environment_prefix = getattr(settings, 'STORAGE_ENVIRONMENT_PREFIX', 'local')
+    
+    def get_available_name(self, name, max_length=None):
+        """
+        파일명에 환경별 prefix 추가
+        예: audios/file.mp3 -> local/audios/file.mp3 또는 production/audios/file.mp3
+        """
+        # 이미 prefix가 있으면 그대로 사용
+        if name.startswith(f'{self.environment_prefix}/'):
+            return super().get_available_name(name, max_length)
+        
+        # prefix 추가
+        prefixed_name = f'{self.environment_prefix}/{name}'
+        return super().get_available_name(prefixed_name, max_length)
+    
+    def _save(self, name, content):
+        """
+        파일 저장 시 환경 prefix 자동 추가
+        """
+        # 이미 prefix가 있는지 확인
+        if not name.startswith(f'{self.environment_prefix}/'):
+            name = f'{self.environment_prefix}/{name}'
+        
+        return super()._save(name, content)
         
     def url(self, name, parameters=None, expire=None, http_method=None):
         """
@@ -40,7 +69,7 @@ class SupabasePrivateStorage(S3Boto3Storage):
         Supabase Storage REST API로 signed URL 생성
         
         Args:
-            file_path: 버킷 내 파일 경로 (예: 'audios/audio-123.mp3')
+            file_path: 버킷 내 파일 경로 (예: 'local/audios/audio-123.mp3')
             expires_in: URL 유효 시간 (초)
         
         Returns:

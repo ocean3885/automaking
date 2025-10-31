@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 from decouple import config, Csv
 from django.core.exceptions import ImproperlyConfigured
+from decouple import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -76,6 +77,45 @@ INSTALLED_APPS = [
 ]
 
 SITE_ID = 1
+
+# -----------------------------------------------------------
+# Storage (Supabase S3 compatible) - configure default storage
+# -----------------------------------------------------------
+
+# NOTE: Configure here so Django uses the correct default_storage for FileField.
+USE_S3_STORAGE = config('USE_S3_STORAGE', default=False, cast=bool)
+
+if USE_S3_STORAGE:
+    if 'storages' not in INSTALLED_APPS:
+        INSTALLED_APPS += ['storages']
+
+    # S3-compatible (Supabase Storage) credentials
+    AWS_ACCESS_KEY_ID = config('AWS_S3_ACCESS_KEY_ID', default=None)
+    AWS_SECRET_ACCESS_KEY = config('AWS_S3_SECRET_ACCESS_KEY', default=None)
+    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default=None)
+    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='ap-southeast-1')
+    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default=None)
+    # Force SigV4 for Supabase S3 compatibility (avoid legacy v2 presign which returns 403)
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    # Ensure path-style addressing to match Supabase endpoint pattern
+    AWS_S3_ADDRESSING_STYLE = 'path'
+
+    # Supabase project info for signed URL generation
+    SUPABASE_URL = config('SUPABASE_URL', default=None)
+    SUPABASE_SERVICE_ROLE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default=None)
+
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',
+    }
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True
+    AWS_QUERYSTRING_EXPIRE = 3600
+
+    # Default to local prefix; env-specific files can override (local/prod)
+    STORAGE_ENVIRONMENT_PREFIX = os.environ.get('STORAGE_ENVIRONMENT_PREFIX', 'local')
+
+    # Ensure custom storage is used globally
+    DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabasePrivateStorage'
 
 # allauth 설정
 AUTHENTICATION_BACKENDS = [
