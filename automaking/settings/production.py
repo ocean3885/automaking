@@ -39,7 +39,8 @@ USE_S3_STORAGE = os.environ.get('USE_S3_STORAGE', 'False').lower() == 'true'
 
 if USE_S3_STORAGE:
     # django-storages 설정
-    INSTALLED_APPS += ['storages']
+    if 'storages' not in INSTALLED_APPS:
+        INSTALLED_APPS += ['storages']
     
     AWS_ACCESS_KEY_ID = os.environ.get('AWS_S3_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_S3_SECRET_ACCESS_KEY')
