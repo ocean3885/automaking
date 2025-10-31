@@ -83,6 +83,7 @@ class SupabasePrivateStorage(S3Boto3Storage):
             raise ValueError("SUPABASE_URL과 SUPABASE_SERVICE_ROLE_KEY가 필요합니다.")
         
         # Supabase Storage API 엔드포인트
+        # 주의: /object/sign/ 엔드포인트 사용
         api_url = f"{supabase_url}/storage/v1/object/sign/{bucket_name}/{file_path}"
         
         headers = {
@@ -92,16 +93,24 @@ class SupabasePrivateStorage(S3Boto3Storage):
         }
         
         payload = {
-            'expiresIn': expires_in
+            'expiresIn': expires_in  # 초 단위
         }
         
-        response = requests.post(api_url, headers=headers, json=payload, timeout=10)
-        
-        if response.status_code == 200:
-            result = response.json()
-            signed_path = result.get('signedURL')
-            if signed_path:
-                # signedURL은 상대 경로로 반환됨 (/storage/v1/object/sign/...)
-                return f"{supabase_url}{signed_path}"
-        
-        raise Exception(f"Signed URL 생성 실패: {response.status_code} - {response.text}")
+        try:
+            response = requests.post(api_url, headers=headers, json=payload, timeout=10)
+            
+            if response.status_code == 200:
+                result = response.json()
+                signed_path = result.get('signedURL')
+                if signed_path:
+                    # signedURL은 상대 경로로 반환됨 (/storage/v1/object/sign/...)
+                    full_url = f"{supabase_url}{signed_path}"
+                    return full_url
+            
+            # 실패 시 에러 로깅
+            logger.error(f"Signed URL 생성 실패: {response.status_code} - {response.text}")
+            raise Exception(f"Signed URL 생성 실패: {response.status_code}")
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Signed URL 생성 중 네트워크 오류: {e}")
+            raise Exception(f"Signed URL 생성 중 네트워크 오류: {e}")
