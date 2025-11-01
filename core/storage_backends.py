@@ -9,9 +9,9 @@ from supabase import create_client, Client
 # --- Supabase 클라이언트 초기화 ---
 # settings.py의 환경 변수를 읽어옵니다.
 try:
-    supabase_url = settings.SUPABASE_URL
+    supabase_url = getattr(settings, 'SUPABASE_URL', '').rstrip('/')
     # 중요: Service Key를 사용해야 RLS를 우회하여 업로드/삭제가 가능합니다.
-    service_key = settings.SUPABASE_SERVICE_KEY 
+    service_key = getattr(settings, 'SUPABASE_SERVICE_ROLE_KEY', None)
     
     if not supabase_url or not service_key:
         raise ValueError("SUPABASE_URL 또는 SUPABASE_SERVICE_KEY가 비어있습니다.")
@@ -30,7 +30,7 @@ class SupabaseStorage(Storage):
     
     settings.py 필요 항목:
     - SUPABASE_URL
-    - SUPABASE_SERVICE_KEY
+    - SUPABASE_SERVICE_ROLE_KEY
     - AWS_STORAGE_BUCKET_NAME (Supabase 버킷 이름)
     """
 
@@ -38,7 +38,7 @@ class SupabaseStorage(Storage):
         super().__init__(*args, **kwargs)
         try:
             # settings.py에서 버킷 이름을 가져옵니다.
-            self.bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+            self.bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
             if not self.bucket_name:
                  raise ValueError("AWS_STORAGE_BUCKET_NAME이 비어있습니다.")
         except (AttributeError, ValueError) as e:
