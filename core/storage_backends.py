@@ -11,7 +11,7 @@ from supabase import create_client, Client
 try:
     supabase_url = getattr(settings, 'SUPABASE_URL', '').rstrip('/')
     # 중요: Service Key를 사용해야 RLS를 우회하여 업로드/삭제가 가능합니다.
-    service_key = getattr(settings, 'SUPABASE_SERVICE_ROLE_KEY', None)
+    service_key = getattr(settings, 'SUPABASE_SERVICE_KEY', None)
     
     if not supabase_url or not service_key:
         raise ValueError("SUPABASE_URL 또는 SUPABASE_SERVICE_KEY가 비어있습니다.")
