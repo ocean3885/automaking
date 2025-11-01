@@ -1,67 +1,121 @@
-import requests
-import logging
-from urllib.parse import quote
+import os
+from io import BytesIO
 from django.conf import settings
-from storages.backends.s3boto3 import S3Boto3Storage
+from django.core.files.base import ContentFile
+from django.core.files.storage import Storage
+from django.utils.deconstruct import deconstructible
+from supabase import create_client, Client
 
-logger = logging.getLogger(__name__)
+# --- Supabase 클라이언트 초기화 ---
+# settings.py의 환경 변수를 읽어옵니다.
+try:
+    supabase_url = settings.SUPABASE_URL
+    # 중요: Service Key를 사용해야 RLS를 우회하여 업로드/삭제가 가능합니다.
+    service_key = settings.SUPABASE_SERVICE_KEY 
+    
+    if not supabase_url or not service_key:
+        raise ValueError("SUPABASE_URL 또는 SUPABASE_SERVICE_KEY가 비어있습니다.")
+        
+    supabase: Client = create_client(supabase_url, service_key)
 
-class SupabasePrivateStorage(S3Boto3Storage):
-    """Supabase 프라이빗 버킷용 Storage 백엔드"""
+except (AttributeError, ValueError) as e:
+    raise ImportError(
+        f"SUPABASE_URL 및 SUPABASE_SERVICE_KEY가 settings.py에 올바르게 설정되어 있는지 확인하세요. 오류: {e}"
+    )
+
+@deconstructible
+class SupabaseStorage(Storage):
+    """
+    Supabase Storage를 위한 Django 커스텀 스토리지 백엔드 (supabase-py SDK 사용)
+    
+    settings.py 필요 항목:
+    - SUPABASE_URL
+    - SUPABASE_SERVICE_KEY
+    - AWS_STORAGE_BUCKET_NAME (Supabase 버킷 이름)
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.querystring_auth = True
-        self.default_acl = None
-        self.environment_prefix = getattr(settings, 'STORAGE_ENVIRONMENT_PREFIX', 'local')
+        try:
+            # settings.py에서 버킷 이름을 가져옵니다.
+            self.bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+            if not self.bucket_name:
+                 raise ValueError("AWS_STORAGE_BUCKET_NAME이 비어있습니다.")
+        except (AttributeError, ValueError) as e:
+            raise ImportError(f"AWS_STORAGE_BUCKET_NAME이 settings.py에 올바르게 설정되어야 합니다. 오류: {e}")
 
-    def get_available_name(self, name, max_length=None):
-        if name.startswith(f'{self.environment_prefix}/'):
-            return super().get_available_name(name, max_length)
-        return super().get_available_name(f'{self.environment_prefix}/{name}', max_length)
+    def _open(self, name, mode='rb'):
+        """파일을 읽을 때 호출됩니다."""
+        try:
+            response = supabase.storage.from_(self.bucket_name).download(name)
+            return ContentFile(response, name=name)
+        except Exception as e:
+            raise FileNotFoundError(f"Supabase '{name}' 파일 열기 실패: {e}")
 
     def _save(self, name, content):
-        if not name.startswith(f'{self.environment_prefix}/'):
-            name = f'{self.environment_prefix}/{name}'
-        if hasattr(content, 'seek'):
-            content.seek(0)
-        return super()._save(name, content)
-
-    def url(self, name, parameters=None, expire=None, http_method=None):
-        if not name:
-            return ''
+        """파일을 저장할 때 호출됩니다."""
         try:
-            return self._generate_supabase_signed_url(name, expire or 3600)
+            # content.read()로 바이너리 데이터를 가져옵니다.
+            # upsert=True는 덮어쓰기 허용입니다.
+            supabase.storage.from_(self.bucket_name).upload(
+                path=name,
+                file=content.read(),
+                file_options={"upsert": True}
+            )
         except Exception as e:
-            logger.warning(f"Supabase signed URL 실패, fallback 사용: {e}")
-            return super().url(name, parameters, expire, http_method)
+            raise IOError(f"Supabase '{name}' 파일 저장 실패: {e}")
+        
+        return name
 
-    def _generate_supabase_signed_url(self, file_path, expires_in=3600):
-        supabase_url = getattr(settings, 'SUPABASE_URL', '').rstrip('/')
-        service_role_key = getattr(settings, 'SUPABASE_SERVICE_ROLE_KEY', None)
-        bucket_name = settings.AWS_STORAGE_BUCKET_NAME
+    def delete(self, name):
+        """파일을 삭제할 때 호출됩니다."""
+        try:
+            supabase.storage.from_(self.bucket_name).remove([name])
+        except Exception as e:
+            print(f"[SupabaseStorage] 파일 '{name}' 삭제 중 오류 (무시): {e}")
+            
+    def exists(self, name):
+        """파일 존재 여부를 확인합니다."""
+        try:
+            dir_path = os.path.dirname(name)
+            file_name = os.path.basename(name)
+            
+            res = supabase.storage.from_(self.bucket_name).list(
+                path=dir_path,
+                options={"search": file_name, "limit": 1}
+            )
+            return any(item['name'] == file_name for item in res)
+        except Exception:
+            return False
 
-        if not supabase_url or not service_role_key:
-            raise ValueError("SUPABASE_URL과 SUPABASE_SERVICE_ROLE_KEY가 필요합니다.")
+    # --------------------------------------------------------------------------
+    # [ 404 오류 / invalid path ] 해결을 위한 핵심 수정 지점
+    # --------------------------------------------------------------------------
+    def url(self, name):
+        """
+        파일에 접근할 수 있는 Presigned URL을 반환합니다.
+        
+        'name'은 버킷 내부의 실제 파일 경로입니다.
+        (예: "production/audios/hablar-1761996515.mp3")
+        """
+        try:
+            # [수정 완료]
+            # create_signed_url에는 버킷 이름을 제외한 'name' (순수 파일 경로)만 전달해야 합니다.
+            # from_(self.bucket_name)이 이미 버킷을 지정했습니다.
+            
+            # [이전 문제의 코드 (추정)]
+            # path_with_bucket = f"{self.bucket_name}/{name}"
+            # res = supabase.storage.from_(self.bucket_name).create_signed_url(path_with_bucket, 3600)
+            
+            # [올바르게 수정된 코드]
+            expires_in = 3600 # 1시간 유효
+            res = supabase.storage.from_(self.bucket_name).create_signed_url(name, expires_in)
+            
+            if 'error' in res or 'data' not in res or 'signedUrl' not in res['data']:
+                 raise ValueError(f"Supabase URL 서명 실패: {res.get('error')}")
 
-        file_path = quote(file_path)
-        api_url = f"{supabase_url}/storage/v1/object/sign/{bucket_name}/{file_path}"
+            return res['data']['signedUrl']
 
-        headers = {
-            'Authorization': f'Bearer {service_role_key}',
-            'apikey': service_role_key,
-            'Content-Type': 'application/json'
-        }
-
-        payload = {'expiresIn': expires_in}
-
-        response = requests.post(api_url, headers=headers, json=payload, timeout=10)
-
-        if response.status_code == 200:
-            result = response.json()
-            if 'signedURL' in result:
-                signed_path = result['signedURL']
-                return f"{supabase_url}{signed_path}"
-
-        logger.error(f"Signed URL 생성 실패: {response.status_code} - {response.text}")
-        raise Exception(f"Signed URL 생성 실패: {response.status_code}")
+        except Exception as e:
+            print(f"[SupabaseStorage] URL 생성 중 오류: {e}")
+            return ""
