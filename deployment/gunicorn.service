@@ -7,7 +7,7 @@ Type=notify
 User=ubuntu
 Group=www-data
 WorkingDirectory=/var/www/automaking
-Environment="PATH=/var/www/automaking/venv/bin"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/var/www/automaking/venv/bin"
 Environment="DJANGO_SETTINGS_MODULE=automaking.settings.production"
 
 # .env.production 파일 로드

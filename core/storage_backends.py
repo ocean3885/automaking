@@ -1,3 +1,4 @@
+from django.core.exceptions import ImproperlyConfigured
 import os
 from io import BytesIO
 from django.conf import settings
@@ -5,6 +6,12 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import Storage
 from django.utils.deconstruct import deconstructible
 from supabase import create_client, Client
+
+
+try:
+    from storages.backends.s3boto3 import S3Boto3Storage
+except Exception as e:
+    raise ImproperlyConfigured(f"django-storages/boto3 불러오기 실패: {e}")
 
 # --- Supabase 클라이언트 초기화 ---
 # settings.py의 환경 변수를 읽어옵니다.
@@ -24,26 +31,27 @@ except (AttributeError, ValueError) as e:
     )
 
 @deconstructible
-class SupabaseStorage(Storage):
+class SupabaseStorage(S3Boto3Storage):
     """
     Supabase Storage를 위한 Django 커스텀 스토리지 백엔드 (supabase-py SDK 사용)
-    
-    settings.py 필요 항목:
-    - SUPABASE_URL
-    - SUPABASE_SERVICE_ROLE_KEY
-    - AWS_STORAGE_BUCKET_NAME (Supabase 버킷 이름)
     """
+    default_acl = None
+    file_overwrite = False
+    querystring_auth = True  # private 버킷: signed URL
+    addressing_style = "path"  # supabase 권장
 
     def __init__(self, *args, **kwargs):
+        required = {
+            "AWS_ACCESS_KEY_ID": getattr(settings, "AWS_ACCESS_KEY_ID", None),
+            "AWS_SECRET_ACCESS_KEY": getattr(settings, "AWS_SECRET_ACCESS_KEY", None),
+            "AWS_STORAGE_BUCKET_NAME": getattr(settings, "AWS_STORAGE_BUCKET_NAME", None),
+            "AWS_S3_ENDPOINT_URL": getattr(settings, "AWS_S3_ENDPOINT_URL", None),
+        }
+        missing = [k for k,v in required.items() if not v]
+        if missing:
+            raise ImproperlyConfigured(f"SupabaseStorage 설정 누락: {', '.join(missing)}")
+        self.environment_prefix = getattr(settings, 'STORAGE_ENVIRONMENT_PREFIX', 'local')
         super().__init__(*args, **kwargs)
-        try:
-            # settings.py에서 버킷 이름을 가져옵니다.
-            self.bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
-            if not self.bucket_name:
-                 raise ValueError("AWS_STORAGE_BUCKET_NAME이 비어있습니다.")
-            self.environment_prefix = getattr(settings, 'STORAGE_ENVIRONMENT_PREFIX', 'local')
-        except (AttributeError, ValueError) as e:
-            raise ImportError(f"AWS_STORAGE_BUCKET_NAME이 settings.py에 올바르게 설정되어야 합니다. 오류: {e}")
 
     def _open(self, name, mode='rb'):
         """파일을 읽을 때 호출됩니다."""
