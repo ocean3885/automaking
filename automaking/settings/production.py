@@ -70,13 +70,14 @@ if USE_S3_STORAGE:
     
     # Supabase 프로젝트 URL (환경 변수에서 가져오기)
     SUPABASE_URL = os.environ.get('SUPABASE_URL')
-    SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
     
     # 환경별 폴더 prefix - 프로덕션은 'production/' 폴더에 저장
     STORAGE_ENVIRONMENT_PREFIX = 'production'
     
     # 커스텀 Storage 백엔드 사용
-    DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabasePrivateStorage'
+    DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabaseStorage'
     
     # MEDIA_URL은 동적으로 signed URL 생성
     MEDIA_URL = '/media/'  # 프록시 URL (뷰에서 signed URL로 리디렉트)

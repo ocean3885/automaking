@@ -238,14 +238,12 @@ def process_file_view(request):
             category=category,
             original_text=original_texts,
             translated_text=translated_texts,
-            audio_data=mp3_base64,
             sync_data=json.dumps(sync_data)
         )
 
         # save mp3 bytes to FileField
         filename = f"{slugify(title) or 'audio'}-{int(time.time())}.mp3"
         audio_obj.audio_file.save(filename, ContentFile(mp3_bytes))
-        audio_obj.save()
 
         # 생성된 오디오의 상세 페이지로 리디렉트
         return redirect('audio_detail', audio_id=audio_obj.id)
@@ -602,13 +600,11 @@ def generate_sentences_view(request):
             category=category,
             original_text=original_texts,
             translated_text=translated_texts,
-            audio_data=mp3_base64,
             sync_data=json.dumps(sync_data)
         )
         
         filename = f"{slugify(title) or 'ai-audio'}-{int(time.time())}.mp3"
         audio_obj.audio_file.save(filename, ContentFile(mp3_bytes))
-        audio_obj.save()
         
         return redirect('audio_detail', audio_id=audio_obj.id)
         

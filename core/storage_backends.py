@@ -41,6 +41,7 @@ class SupabaseStorage(Storage):
             self.bucket_name = getattr(settings, 'AWS_STORAGE_BUCKET_NAME', None)
             if not self.bucket_name:
                  raise ValueError("AWS_STORAGE_BUCKET_NAME이 비어있습니다.")
+            self.environment_prefix = getattr(settings, 'STORAGE_ENVIRONMENT_PREFIX', 'local')
         except (AttributeError, ValueError) as e:
             raise ImportError(f"AWS_STORAGE_BUCKET_NAME이 settings.py에 올바르게 설정되어야 합니다. 오류: {e}")
 
@@ -53,10 +54,17 @@ class SupabaseStorage(Storage):
             raise FileNotFoundError(f"Supabase '{name}' 파일 열기 실패: {e}")
 
     def _save(self, name, content):
-        """파일을 저장할 때 호출됩니다."""
+        """
+        파일을 저장할 때 호출됩니다.
+        'name' (예: 'audios/file.mp3') 앞에 환경 prefix(예: 'production')를 붙입니다.
+        """
+        
+        # 'name'이 이미 prefix로 시작하는지 확인 (마이그레이션 등)
+        if not name.startswith(f"{self.environment_prefix}/"):
+            # 'production' + '/' + 'audios/file.mp3' = 'production/audios/file.mp3'
+            name = f"{self.environment_prefix}/{name}"
+        
         try:
-            # content.read()로 바이너리 데이터를 가져옵니다.
-            # upsert=True는 덮어쓰기 허용입니다.
             supabase.storage.from_(self.bucket_name).upload(
                 path=name,
                 file=content.read(),
@@ -65,6 +73,7 @@ class SupabaseStorage(Storage):
         except Exception as e:
             raise IOError(f"Supabase '{name}' 파일 저장 실패: {e}")
         
+        # 'production/audios/file.mp3' (전체 경로)를 반환하여 DB에 저장
         return name
 
     def delete(self, name):
@@ -99,15 +108,6 @@ class SupabaseStorage(Storage):
         (예: "production/audios/hablar-1761996515.mp3")
         """
         try:
-            # [수정 완료]
-            # create_signed_url에는 버킷 이름을 제외한 'name' (순수 파일 경로)만 전달해야 합니다.
-            # from_(self.bucket_name)이 이미 버킷을 지정했습니다.
-            
-            # [이전 문제의 코드 (추정)]
-            # path_with_bucket = f"{self.bucket_name}/{name}"
-            # res = supabase.storage.from_(self.bucket_name).create_signed_url(path_with_bucket, 3600)
-            
-            # [올바르게 수정된 코드]
             expires_in = 3600 # 1시간 유효
             res = supabase.storage.from_(self.bucket_name).create_signed_url(name, expires_in)
             

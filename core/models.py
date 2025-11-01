@@ -2,6 +2,10 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.conf import settings
 import os
+import logging
+
+# 로거 설정
+logger = logging.getLogger(__name__)
 
 # User 모델 확장: 멤버십 정보 추가
 class UserProfile(models.Model):
@@ -60,20 +64,10 @@ class AudioContent(models.Model):
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='audio_contents')
     original_text = models.TextField()
     translated_text = models.TextField()
-    audio_data = models.TextField()  # Base64로 인코딩된 오디오 데이터
-    # 환경에 따라 다른 스토리지 사용 (Supabase Storage or Local)
-    # settings.USE_S3_STORAGE=True면 Supabase Storage를 사용하도록 강제
-    try:
-        from .storage_backends import SupabasePrivateStorage
-    except Exception:
-        SupabasePrivateStorage = None
-
-    _storage_backend = SupabasePrivateStorage() if getattr(settings, 'USE_S3_STORAGE', False) and SupabasePrivateStorage else None
-
-    audio_file = models.FileField(upload_to='audios/', storage=_storage_backend, null=True, blank=True)
-    sync_data = models.TextField(null=True, blank=True)  # JSON 문자열으로 저장된 타임스탬프 데이터
+    audio_file = models.FileField(upload_to='audios/', null=True, blank=True)
+    sync_data = models.TextField(null=True, blank=True)  # JSON 문자열 (타임스탬프)
     view_count = models.IntegerField(default=0)  # 조회수
-    collections = models.ManyToManyField(Collection, related_name='audio_contents', blank=True)  # 보관함 다대다 관계
+    collections = models.ManyToManyField(Collection, related_name='audio_contents', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -82,18 +76,16 @@ class AudioContent(models.Model):
 
     def delete(self, *args, **kwargs):
         """
-        오디오 파일 삭제 시 연결된 파일도 함께 삭제합니다.
-        로컬 파일 시스템과 S3 호환 스토리지 모두 지원합니다.
+        객체 삭제 시 연결된 파일도 함께 삭제합니다.
+        (이 로직은 수정 없이 그대로 사용해도 좋습니다.)
         """
         if self.audio_file:
             try:
-                # Django storage를 통해 삭제 (로컬/S3 모두 지원)
+                # self.audio_file.storage.delete()와 동일하게 작동
                 self.audio_file.delete(save=False)
             except Exception as e:
-                # 파일 삭제 실패 시 로깅 (선택사항)
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"Failed to delete audio file: {e}")
+                logger.warning(f"오디오 파일 삭제 실패 (파일: {self.audio_file.name}): {e}")
+        
         super().delete(*args, **kwargs)
 
     class Meta:
