@@ -34,57 +34,17 @@ DATABASES = {
 STATIC_ROOT = os.environ.get('STATIC_ROOT', '/var/www/automaking/static/')
 STATIC_URL = '/static/'
 
-# Media files - Supabase Storage (S3 Compatible)
-USE_S3_STORAGE = os.environ.get('USE_S3_STORAGE', 'False').lower() == 'true'
+    
+# HTTPS 연결 강제
+AWS_S3_USE_SSL = True
+AWS_S3_VERIFY = True  # SSL 인증서 검증
 
-if USE_S3_STORAGE:
-    # django-storages 설정
-    if 'storages' not in INSTALLED_APPS:
-        INSTALLED_APPS += ['storages']
-    
-    AWS_ACCESS_KEY_ID = os.environ.get('AWS_S3_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_S3_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-    AWS_S3_REGION_NAME = os.environ.get('AWS_S3_REGION_NAME', 'ap-southeast-1')
-    AWS_S3_ENDPOINT_URL = os.environ.get('AWS_S3_ENDPOINT_URL')
-    
-    # Supabase S3 presign requires SigV4
-    AWS_S3_SIGNATURE_VERSION = 's3v4'
-    AWS_S3_ADDRESSING_STYLE = 'path'
-    
-    # 프라이빗 버킷 설정
-    AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
-    }
-    AWS_DEFAULT_ACL = None  # 프라이빗 버킷은 ACL 사용 안 함
-    AWS_QUERYSTRING_AUTH = True  # Signed URL 사용
-    AWS_QUERYSTRING_EXPIRE = 3600  # Signed URL 유효 시간 (1시간)
-    
-    # HTTPS 연결 강제
-    AWS_S3_USE_SSL = True
-    AWS_S3_VERIFY = True  # SSL 인증서 검증
-    
-    # URL 관련 설정
-    AWS_S3_CUSTOM_DOMAIN = None  # 커스텀 도메인 사용 안 함
-    AWS_S3_URL_PROTOCOL = 'https:'  # HTTPS 사용
-    
-    # Supabase 프로젝트 URL (환경 변수에서 가져오기)
-    SUPABASE_URL = os.environ.get('SUPABASE_URL')
-    SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
-    AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-    
-    # 환경별 폴더 prefix - 프로덕션은 'production/' 폴더에 저장
-    STORAGE_ENVIRONMENT_PREFIX = 'production'
-    
-    # 커스텀 Storage 백엔드 사용
-    DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabaseStorage'
-    
-    # MEDIA_URL은 동적으로 signed URL 생성
-    MEDIA_URL = '/media/'  # 프록시 URL (뷰에서 signed URL로 리디렉트)
-else:
-    # 로컬 파일 시스템 사용 (개발/테스트용)
-    MEDIA_ROOT = BASE_DIR / 'media'
-    MEDIA_URL = '/media/'
+# URL 관련 설정
+AWS_S3_CUSTOM_DOMAIN = None  # 커스텀 도메인 사용 안 함
+AWS_S3_URL_PROTOCOL = 'https:'  # HTTPS 사용
+
+# 환경별 폴더 prefix - 프로덕션은 'production/' 폴더에 저장
+STORAGE_ENVIRONMENT_PREFIX = 'production'
 
 # Security settings
 SECURE_SSL_REDIRECT = True

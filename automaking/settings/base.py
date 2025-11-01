@@ -83,7 +83,7 @@ SITE_ID = 1
 # -----------------------------------------------------------
 
 # NOTE: Configure here so Django uses the correct default_storage for FileField.
-USE_S3_STORAGE = config('USE_S3_STORAGE', default=False, cast=bool)
+USE_S3_STORAGE = True
 
 if USE_S3_STORAGE:
     if 'storages' not in INSTALLED_APPS:
@@ -102,7 +102,7 @@ if USE_S3_STORAGE:
 
     # Supabase project info for signed URL generation
     SUPABASE_URL = config('SUPABASE_URL', default=None)
-    SUPABASE_SERVICE_ROLE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default=None)
+    SUPABASE_SERVICE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default=None)
 
     AWS_S3_OBJECT_PARAMETERS = {
         'CacheControl': 'max-age=86400',
@@ -115,7 +115,7 @@ if USE_S3_STORAGE:
     STORAGE_ENVIRONMENT_PREFIX = os.environ.get('STORAGE_ENVIRONMENT_PREFIX', 'local')
 
     # Ensure custom storage is used globally
-    DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabasePrivateStorage'
+    DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabaseStorage'
 
 # allauth 설정
 AUTHENTICATION_BACKENDS = [
