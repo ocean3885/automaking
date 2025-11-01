@@ -98,45 +98,6 @@ SECURE_HSTS_SECONDS = 31536000  # 1년
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
 
-# CORS 설정
-# django-cors-headers가 설치되어 있어야 합니다: pip install django-cors-headers
-if 'corsheaders' not in INSTALLED_APPS:
-    INSTALLED_APPS = ['corsheaders'] + INSTALLED_APPS
-
-if 'corsheaders.middleware.CorsMiddleware' not in MIDDLEWARE:
-    # CorsMiddleware는 가능한 한 상단에 위치해야 합니다
-    MIDDLEWARE.insert(0, 'corsheaders.middleware.CorsMiddleware')
-
-# 허용할 Origin 설정
-CORS_ALLOWED_ORIGINS = [
-    "https://lang.ai.kr",
-    "https://www.lang.ai.kr",
-]
-
-# 개발/테스트를 위해 IP도 추가 (나중에 제거 가능)
-if os.environ.get('DJANGO_ENV') == 'development':
-    CORS_ALLOWED_ORIGINS += [
-        "http://52.79.212.162",
-        "http://ec2-52-79-212-162.ap-northeast-2.compute.amazonaws.com",
-    ]
-
-# 자격증명(쿠키 등)을 포함한 요청 허용
-CORS_ALLOW_CREDENTIALS = True
-
-# CORS 허용 헤더
-CORS_ALLOW_HEADERS = [
-    'accept',
-    'accept-encoding',
-    'authorization',
-    'content-type',
-    'dnt',
-    'origin',
-    'user-agent',
-    'x-csrftoken',
-    'x-requested-with',
-    'range',  # 오디오 스트리밍을 위해 중요
-]
-
 # 로깅 설정
 LOGGING = {
     'version': 1,
