@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
             field=models.FileField(
                 blank=True,
                 null=True,
-                storage=core.storage_backends.SupabasePrivateStorage(),
+                storage=core.storage_backends.SupabaseStorage(),
                 upload_to="audios/",
             ),
         ),
