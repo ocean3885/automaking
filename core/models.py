@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from django.conf import settings
+from django.core.files.storage import default_storage
 import os
 import logging
 
@@ -58,13 +58,27 @@ class Collection(models.Model):
         unique_together = ['user', 'name']  # 같은 사용자는 같은 이름의 보관함을 중복 생성 불가
 
 
+def get_audio_storage():
+    """동적으로 storage를 가져오기"""
+    from django.conf import settings
+    if settings.USE_S3_STORAGE:
+        from core.storage import SupabaseStorage
+        return SupabaseStorage()
+    return default_storage
+
+def audio_upload_path(instance, filename):
+    """환경별 업로드 경로 설정"""
+    from django.conf import settings
+    prefix = getattr(settings, 'STORAGE_ENVIRONMENT_PREFIX', 'local')
+    return f"{prefix}/audios/{filename}"
+
 class AudioContent(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audio_contents')
     title = models.CharField(max_length=200)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, related_name='audio_contents')
     original_text = models.TextField()
     translated_text = models.TextField()
-    audio_file = models.FileField(upload_to='audios/', null=True, blank=True)
+    audio_file = models.FileField(upload_to=audio_upload_path, null=True, blank=True, storage=get_audio_storage)
     sync_data = models.TextField(null=True, blank=True)  # JSON 문자열 (타임스탬프)
     view_count = models.IntegerField(default=0)  # 조회수
     collections = models.ManyToManyField(Collection, related_name='audio_contents', blank=True)

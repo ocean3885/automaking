@@ -1,6 +1,4 @@
 from google.cloud import texttospeech
-# Django 설정 가져오기 (실제 Django 프로젝트에 맞게 수정)
-from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured 
 
 def get_tts_client():

@@ -4,25 +4,58 @@ Django base settings for automaking project.
 """
 from pathlib import Path
 import os
-from decouple import config, Csv
 from django.core.exceptions import ImproperlyConfigured
-from decouple import config
+from decouple import AutoConfig
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+config = AutoConfig(search_path=os.path.join(BASE_DIR, '.env'))
 
 # -----------------------------------------------------------
 # 환경 변수 로드 (.env 파일)
 # -----------------------------------------------------------
 
-# SECRET_KEY - 환경 변수에서 직접 로드 (배포 시 일관성 유지)
-SECRET_KEY = os.environ.get('SECRET_KEY')
-if not SECRET_KEY:
-    # 개발 환경에서는 decouple 사용 (로컬에서 .env 파일 사용)
-    try:
-        SECRET_KEY = config('SECRET_KEY')
-    except Exception:
-        raise ImproperlyConfigured("SECRET_KEY 환경 변수를 설정해주세요.")
+SECRET_KEY = config('SECRET_KEY')
+
+# Media files (user uploaded)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# -----------------------------------------------------------
+# Storage (Supabase S3 compatible) - configure default storage
+# -----------------------------------------------------------
+
+USE_S3_STORAGE = True
+
+if USE_S3_STORAGE:
+
+    # S3-compatible (Supabase Storage) credentials
+    AWS_ACCESS_KEY_ID = config('AWS_S3_ACCESS_KEY_ID', default=None)
+    AWS_SECRET_ACCESS_KEY = config('AWS_S3_SECRET_ACCESS_KEY', default=None)
+    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default=None)
+    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='ap-southeast-1')
+    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default=None)
+    # Force SigV4 for Supabase S3 compatibility (avoid legacy v2 presign which returns 403)
+    AWS_S3_SIGNATURE_VERSION = 's3v4'
+    # Ensure path-style addressing to match Supabase endpoint pattern
+    AWS_S3_ADDRESSING_STYLE = 'path'
+
+    # Supabase project info for signed URL generation
+    SUPABASE_URL = config('SUPABASE_URL', default=None)
+    SUPABASE_SERVICE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default=None)
+
+    AWS_S3_OBJECT_PARAMETERS = {
+        'CacheControl': 'max-age=86400',
+    }
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True
+    AWS_QUERYSTRING_EXPIRE = 3600
+
+    # Default to local prefix; env-specific files can override (local/prod)
+    STORAGE_ENVIRONMENT_PREFIX = os.environ.get('STORAGE_ENVIRONMENT_PREFIX', 'local')
+
+    # Ensure custom storage is used globally
+    DEFAULT_FILE_STORAGE = 'core.storage.SupabaseStorage'
 
 # Google Cloud TTS 설정 (환경 변수에서 로드)
 def get_google_cloud_credentials():
@@ -61,6 +94,7 @@ def get_google_cloud_credentials():
 
 GOOGLE_CLOUD_CREDENTIALS_JSON = get_google_cloud_credentials()
 
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -73,49 +107,11 @@ INSTALLED_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
-    "core",
+    "core.apps.CoreConfig",
+    'storages',
 ]
 
 SITE_ID = 1
-
-# -----------------------------------------------------------
-# Storage (Supabase S3 compatible) - configure default storage
-# -----------------------------------------------------------
-
-# NOTE: Configure here so Django uses the correct default_storage for FileField.
-USE_S3_STORAGE = True
-
-if USE_S3_STORAGE:
-    if 'storages' not in INSTALLED_APPS:
-        INSTALLED_APPS += ['storages']
-
-    # S3-compatible (Supabase Storage) credentials
-    AWS_ACCESS_KEY_ID = config('AWS_S3_ACCESS_KEY_ID', default=None)
-    AWS_SECRET_ACCESS_KEY = config('AWS_S3_SECRET_ACCESS_KEY', default=None)
-    AWS_STORAGE_BUCKET_NAME = config('AWS_STORAGE_BUCKET_NAME', default=None)
-    AWS_S3_REGION_NAME = config('AWS_S3_REGION_NAME', default='ap-southeast-1')
-    AWS_S3_ENDPOINT_URL = config('AWS_S3_ENDPOINT_URL', default=None)
-    # Force SigV4 for Supabase S3 compatibility (avoid legacy v2 presign which returns 403)
-    AWS_S3_SIGNATURE_VERSION = 's3v4'
-    # Ensure path-style addressing to match Supabase endpoint pattern
-    AWS_S3_ADDRESSING_STYLE = 'path'
-
-    # Supabase project info for signed URL generation
-    SUPABASE_URL = config('SUPABASE_URL', default=None)
-    SUPABASE_SERVICE_KEY = config('SUPABASE_SERVICE_ROLE_KEY', default=None)
-
-    AWS_S3_OBJECT_PARAMETERS = {
-        'CacheControl': 'max-age=86400',
-    }
-    AWS_DEFAULT_ACL = None
-    AWS_QUERYSTRING_AUTH = True
-    AWS_QUERYSTRING_EXPIRE = 3600
-
-    # Default to local prefix; env-specific files can override (local/prod)
-    STORAGE_ENVIRONMENT_PREFIX = os.environ.get('STORAGE_ENVIRONMENT_PREFIX', 'local')
-
-    # Ensure custom storage is used globally
-    DEFAULT_FILE_STORAGE = 'core.storage_backends.SupabaseStorage'
 
 # allauth 설정
 AUTHENTICATION_BACKENDS = [
@@ -183,9 +179,6 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = "static/"
 
-# Media files (user uploaded)
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

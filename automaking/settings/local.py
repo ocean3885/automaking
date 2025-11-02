@@ -2,7 +2,6 @@
 로컬 개발 환경 설정
 """
 from .base import *
-from decouple import config
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
