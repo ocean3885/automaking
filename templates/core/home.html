@@ -9,14 +9,14 @@
         <p class="lead">자동화된 음성 생성 서비스</p>
         
         {% if user.is_authenticated %}
-            <div class="mt-4">
+            <div class="mt-4 d-grid gap-2 d-sm-flex justify-content-sm-center"> 
                 <a href="{% url 'upload' %}" class="btn btn-primary btn-lg">
                     <i class="fas fa-plus-circle"></i> 음성 만들기
                 </a>
-                <a href="{% url 'audio_list' %}" class="btn btn-success btn-lg ms-3">
+                <a href="{% url 'audio_list' %}" class="btn btn-success btn-lg">
                     <i class="fas fa-list"></i> 내 학습 목록
                 </a>
-                <a href="{% url 'collection_list' %}" class="btn btn-info btn-lg ms-3">
+                <a href="{% url 'collection_list' %}" class="btn btn-info btn-lg">
                     <i class="fas fa-folder"></i> 내 보관함
                 </a>
             </div>
@@ -30,10 +30,9 @@
 
     {% if category_posts %}
     <div class="my-5">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center mb-4">
             <h2><i class="fas fa-fire"></i> 카테고리별 최신 게시물</h2>
-            <div class="text-muted">
-                <small>
+            <div class="text-muted mt-2 mt-sm-0"> <small>
                     <i class="fas fa-music"></i> 전체 게시물: {{ total_posts }}개 | 
                     <i class="fas fa-tag"></i> 카테고리: {{ total_categories }}개
                 </small>
@@ -55,7 +54,7 @@
             <div class="card-body">
                 <div class="row">
                     {% for post in item.posts %}
-                    <div class="col-md-6 col-lg-4 mb-3">
+                    <div class="col-md-6 col-lg-4 mb-3"> 
                         <div class="card h-100 shadow-sm">
                             <div class="card-body">
                                 <h6 class="card-title">
@@ -107,10 +106,10 @@
     {% endif %}
 </div>
 
-<!-- Font Awesome CDN -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <style>
+/* 기존 CSS 스타일 유지 */
 .card {
     transition: transform 0.2s, box-shadow 0.2s;
 }

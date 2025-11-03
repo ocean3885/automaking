@@ -1,15 +1,71 @@
 {% extends 'base.html' %}
 
+{% load static %}
+
 {% block title %}{{ audio.title }} - AutoMaking{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 제목 편집 시 마우스 오버 스타일 */
+    .title-editable:hover {
+        text-decoration: underline;
+    }
+
+    /* 문장 아이템 스타일 */
+    .sentence-item {
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 6px;
+        transition: background-color 180ms ease, transform 120ms ease;
+    }
+
+    .sentence-item:hover {
+        background-color: #f8f9fa;
+        transform: translateY(-2px);
+    }
+
+    .sentence-item .original {
+        color: #333;
+        font-weight: normal;
+    }
+
+    /* 활성 문장 스타일 */
+    .sentence-item.active {
+        background-color: #fff5f5;
+        /* 연한 붉은색 배경 */
+    }
+
+    .sentence-item.active .original {
+        color: #c00;
+        font-weight: 700;
+    }
+
+    .sentence-item .translation {
+        color: #666;
+    }
+
+    /* 반복 재생 활성화 시 버튼 스타일 */
+    #repeatBtn.active {
+        background-color: #007bff;
+        color: white;
+    }
+
+    /* 모바일에서 터치하기 쉽도록 클릭 영역 확장 */
+    @media (max-width: 767px) {
+        .sentence-item {
+            padding: 1rem;
+        }
+    }
+</style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %}
+
 
 {% block content %}
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="d-flex align-items-center">
-            <span id="titleDisplay" class="me-2" style="cursor: pointer;" title="클릭하여 제목 수정">{{ audio.title }}</span>
-            <button id="editTitleBtn" class="btn btn-sm btn-outline-secondary" style="display: none;">
-                <i class="fas fa-check"></i>
-            </button>
+            <span class="me-2">{{ audio.title }}</span>
         </h1>
         <div>
             {% if not is_in_collection %}
@@ -35,7 +91,6 @@
                             <option value="0" {% if not audio.category %}selected{% endif %}>
                                 카테고리 없음
                             </option>
-
                             {% for category in categories %}
                             <option value="{{ category.id }}" {% if audio.category == category %}selected{% endif %}>
                                 {{ category.name }}
@@ -97,7 +152,6 @@
                     <i class="fas fa-redo"></i> 현재 문장 반복
                 </button>
             </div>
-            <!-- 5초 버튼 제거: 좌/우 화살표로 -10s/+10s 이동하여 재생 -->
         </div>
     </div>
 
@@ -106,50 +160,6 @@
             <h5 class="card-title mb-0">문장 목록</h5>
         </div>
         <div class="card-body">
-            <style>
-                .sentence-item {
-                    cursor: pointer;
-                    padding: 0.5rem;
-                    border-radius: 6px;
-                    transition: background-color 180ms ease, transform 120ms ease;
-                }
-
-                .sentence-item:hover {
-                    background-color: #f8f9fa;
-                    transform: translateY(-2px);
-                }
-
-                .sentence-item .original {
-                    color: #333;
-                    font-weight: normal;
-                }
-
-                .sentence-item.active {
-                    background-color: #fff5f5;
-                }
-
-                .sentence-item.active .original {
-                    color: #c00;
-                    font-weight: 700;
-                }
-
-                .sentence-item .translation {
-                    color: #666;
-                }
-
-                /* 반복 재생 활성화 시 버튼 스타일 */
-                #repeatBtn.active {
-                    background-color: #007bff;
-                    color: white;
-                }
-
-                /* 모바일에서 터치하기 쉽도록 클릭 영역 확장 */
-                @media (max-width: 767px) {
-                    .sentence-item {
-                        padding: 1rem;
-                    }
-                }
-            </style>
             {% for s in sentences_with_times %}
             <div class="border-bottom py-3 {% if not forloop.last %}mb-3{% endif %} sentence-item"
                 data-start="{{ s.start }}" data-end="{{ s.end }}" data-index="{{ forloop.counter0 }}">
@@ -161,511 +171,23 @@
     </div>
 </div>
 
-<!-- Font Awesome CDN 추가 -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% include 'partials/add_to_collection_modal.html' %}
 
+{% endblock %}
+
+
+{% block extra_js %}
 <script>
-    // DOM이 완전히 로드된 후 실행
-    document.addEventListener('DOMContentLoaded', function () {
-
-        // 제목 편집 기능
-        const titleDisplay = document.getElementById('titleDisplay');
-        const editTitleBtn = document.getElementById('editTitleBtn');
-        let isEditingTitle = false;
-        let originalTitle = titleDisplay.textContent;
-
-        titleDisplay.addEventListener('click', () => {
-            if (!isEditingTitle) {
-                isEditingTitle = true;
-                originalTitle = titleDisplay.textContent;
-                titleDisplay.contentEditable = true;
-                titleDisplay.focus();
-                editTitleBtn.style.display = 'inline-block';
-
-                // 전체 텍스트 선택
-                const range = document.createRange();
-                range.selectNodeContents(titleDisplay);
-                const selection = window.getSelection();
-                selection.removeAllRanges();
-                selection.addRange(range);
-            }
-        });
-
-        // Enter 키로 저장, Esc 키로 취소
-        titleDisplay.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                await saveTitle();
-            } else if (e.key === 'Escape') {
-                cancelTitleEdit();
-            }
-        });
-
-        editTitleBtn.addEventListener('click', saveTitle);
-
-        async function saveTitle() {
-            if (!isEditingTitle) return;
-
-            const newTitle = titleDisplay.textContent.trim();
-            if (!newTitle) {
-                alert('제목은 비워둘 수 없습니다.');
-                titleDisplay.textContent = originalTitle;
-                return;
-            }
-
-            try {
-                const response = await fetch('{% url "update_audio" audio.id %}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify({ title: newTitle })
-                });
-
-                const data = await response.json();
-                if (response.ok) {
-                    titleDisplay.textContent = data.title;
-                    endTitleEdit();
-                } else {
-                    alert(data.error || '제목 수정에 실패했습니다.');
-                    titleDisplay.textContent = originalTitle;
-                    endTitleEdit();
-                }
-            } catch (error) {
-                alert('오류가 발생했습니다.');
-                console.error(error);
-                titleDisplay.textContent = originalTitle;
-                endTitleEdit();
-            }
-        }
-
-        function cancelTitleEdit() {
-            titleDisplay.textContent = originalTitle;
-            endTitleEdit();
-        }
-
-        function endTitleEdit() {
-            isEditingTitle = false;
-            titleDisplay.contentEditable = false;
-            editTitleBtn.style.display = 'none';
-        }
-
-        // 카테고리 변경 처리
-        const categorySelect = document.getElementById('categorySelect');
-        categorySelect.addEventListener('change', async () => {
-            try {
-                const response = await fetch('{% url "update_audio" audio.id %}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify({ category_id: categorySelect.value })
-                });
-
-                const data = await response.json();
-                if (!response.ok) {
-                    alert(data.error || '카테고리 변경에 실패했습니다.');
-                    // 실패하면 이전 선택으로 되돌림
-                    categorySelect.value = data.category?.id || "0";
-                }
-            } catch (error) {
-                alert('오류가 발생했습니다.');
-                console.error(error);
-            }
-        });
-
-        // 삭제 버튼
-        document.getElementById('deleteBtn').addEventListener('click', async function () {
-            if (confirm('정말 삭제하시겠습니까?')) {
-                try {
-                    const response = await fetch('{% url "delete_audio" audio.id %}', {
-                        method: 'POST',
-                        headers: {
-                            'X-CSRFToken': '{{ csrf_token }}'
-                        }
-                    });
-
-                    if (response.ok) {
-                        window.location.href = '{% url "audio_list" %}';
-                    } else {
-                        alert('삭제에 실패했습니다.');
-                    }
-                } catch (error) {
-                    alert('오류가 발생했습니다.');
-                    console.error(error);
-                }
-            }
-        });
-
-        const audio = document.getElementById('audio-player');
-        const repeatBtn = document.getElementById('repeatBtn');
-        const playPauseBtn = document.getElementById('playPauseBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const progressBar = document.getElementById('progressBar');
-        const currentTimeEl = document.getElementById('currentTime');
-        const durationEl = document.getElementById('duration');
-
-        let isRepeating = false;
-        let currentRepeatStart = 0;
-        let currentRepeatEnd = 0;
-
-        // 시간을 mm:ss 형식으로 포맷팅
-        function formatTime(seconds) {
-            seconds = Math.floor(seconds);
-            const minutes = Math.floor(seconds / 60);
-            seconds = seconds % 60;
-            return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-        }
-
-        // 재생/일시정지 버튼 클릭
-        playPauseBtn.addEventListener('click', () => {
-            if (audio.paused) {
-                audio.play().catch(error => {
-                    // AbortError는 사용자의 빠른 조작으로 발생할 수 있으므로 무시합니다.
-                    if (error.name !== 'AbortError') {
-                        console.error('오디오 재생 실패:', error);
-                    }
-                });
-            } else {
-                audio.pause();
-            }
-        });
-
-        // 정지 버튼 클릭
-        stopBtn.addEventListener('click', () => {
-            audio.pause();
-            audio.currentTime = 0;
-            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-        });
-
-        // 재생 상태 변경 시 버튼 아이콘 업데이트
-        audio.addEventListener('play', () => {
-            playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-        });
-
-        audio.addEventListener('pause', () => {
-            playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-        });
-
-        // 재생 시간 및 프로그레스 바 업데이트
-        audio.addEventListener('loadedmetadata', () => {
-            durationEl.textContent = formatTime(audio.duration);
-        });
-
-        audio.addEventListener('timeupdate', () => {
-            const percent = (audio.currentTime / audio.duration) * 100;
-            progressBar.style.width = `${percent}%`;
-            currentTimeEl.textContent = formatTime(audio.currentTime);
-        });
-
-        // 재생 속도 변경
-        const speedOptions = document.querySelectorAll('.speed-option');
-        const speedLabel = document.getElementById('speedLabel');
-
-        speedOptions.forEach(option => {
-            option.addEventListener('click', (e) => {
-                e.preventDefault();
-                const speed = parseFloat(option.getAttribute('data-speed'));
-                audio.playbackRate = speed;
-                speedLabel.textContent = `${speed}x`;
-
-                // 활성 상태 업데이트
-                speedOptions.forEach(opt => opt.classList.remove('active'));
-                option.classList.add('active');
-            });
-        });
-
-        // 반복 재생 버튼 클릭 이벤트
-        repeatBtn.addEventListener('click', () => {
-            isRepeating = !isRepeating;
-            repeatBtn.classList.toggle('active');
-
-            if (isRepeating) {
-                // 현재 재생 중인 문장의 시작/종료 시간 저장
-                const activeItem = document.querySelector('.sentence-item.active');
-                if (activeItem) {
-                    currentRepeatStart = parseFloat(activeItem.getAttribute('data-start')) || 0;
-                    currentRepeatEnd = parseFloat(activeItem.getAttribute('data-end')) || 0;
-                } else {
-                    // 활성 문장이 없으면 반복 재생 비활성화
-                    isRepeating = false;
-                    repeatBtn.classList.remove('active');
-                }
-            }
-        });
-
-        // 오디오 timeupdate 이벤트에서 반복 재생 처리
-        audio.addEventListener('timeupdate', () => {
-            const currentTime = audio.currentTime;
-
-            // 반복 재생 중이고 현재 시간이 종료 시간을 넘어가면
-            if (isRepeating && currentTime >= currentRepeatEnd) {
-                // 시작 시간으로 되돌아가서 재생
-                audio.currentTime = currentRepeatStart;
-            }
-        });
-
-        // 키보드 좌/우 화살표로 -10초/+10초 이동하고 재생 (더 안정적 처리)
-        document.addEventListener('keydown', (e) => {
-            // 입력 중이면 키 조작을 방지
-            const tag = e.target && e.target.tagName;
-            if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return;
-
-            // 브라우저/환경별로 키 이름이 다를 수 있으니 여러 케이스 지원
-            const isLeft = e.key === 'ArrowLeft' || e.key === 'Left' || e.keyCode === 37;
-            const isRight = e.key === 'ArrowRight' || e.key === 'Right' || e.keyCode === 39;
-            if (!isLeft && !isRight) return;
-
-            // 페이지 스크롤 같은 기본 동작 방지
-            e.preventDefault();
-
-            // 현재 시간이 유효한 숫자인지 확인
-            const cur = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
-
-            // --- (이 부분을 추가) ---
-            // play() Promise 에러 핸들러 (AbortError는 무시)
-            const playPromiseHandler = (error) => {
-                if (error.name !== 'AbortError') {
-                    console.error('Audio play failed after seek:', error);
-                }
-            };
-            // -----------------------
-
-            if (isLeft) {
-                const newTime = Math.max(0, cur - 10);
-                audio.currentTime = newTime;
-                audio.play().catch(playPromiseHandler); // .catch() 추가
-            } else if (isRight) {
-                let newTime = cur + 10;
-                // duration이 유한한 값이면 범위 안으로 제한
-                if (Number.isFinite(audio.duration)) {
-                    newTime = Math.min(audio.duration, newTime);
-                }
-                audio.currentTime = newTime;
-                audio.play().catch(playPromiseHandler); // .catch() 추가
-            }
-        });
-
-        // 문장 클릭 시 해당 시간으로 이동하여 재생하고 현재 재생 중인 문장 하이라이트 처리
-        const sentenceItems = Array.from(document.querySelectorAll('.sentence-item'));
-        sentenceItems.forEach(item => {
-            item.addEventListener('click', () => {
-                const start = parseFloat(item.getAttribute('data-start')) || 0;
-                // 스크롤을 중앙에 부드럽게 위치
-                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // 페이드 아웃 -> seek -> 재생 -> 페이드 인
-                seekWithFade(start);
-                updateActiveSentenceByTime(start);
-            });
-        });
-
-        let _fadeInterval = null;
-        function fadeVolume(target, duration = 150, cb) {
-            if (_fadeInterval) clearInterval(_fadeInterval);
-            const start = Number.isFinite(audio.volume) ? audio.volume : 1;
-            const diff = target - start;
-            const steps = Math.max(1, Math.floor(duration / 16));
-            let i = 0;
-            const stepTime = duration / steps;
-            _fadeInterval = setInterval(() => {
-                i++;
-                const v = start + diff * (i / steps);
-                audio.volume = Math.max(0, Math.min(1, v));
-                if (i >= steps) {
-                    clearInterval(_fadeInterval);
-                    _fadeInterval = null;
-                    if (cb) cb();
-                }
-            }, stepTime);
-        }
-
-        function seekWithFade(timeSec) {
-            // 오디오가 준비될 때까지 기다린 후 seek 실행
-            const doSeekAndPlay = () => {
-                try {
-                    // 명시적으로 currentTime 설정 후 재생
-                    audio.currentTime = timeSec;
-                    // seeked 이벤트를 기다려서 안정적으로 재생
-                    const onSeeked = () => {
-                        audio.removeEventListener('seeked', onSeeked);
-                        audio.play().catch(err => console.warn('play error:', err));
-                        // 재생 후 볼륨 페이드인
-                        fadeVolume(1, 160);
-                    };
-                    audio.addEventListener('seeked', onSeeked);
-                } catch (e) {
-                    console.warn('seek error', e);
-                    // 오류 시에도 재생 시도
-                    audio.play().catch(() => { });
-                    fadeVolume(1, 160);
-                }
-            };
-
-            // 빠르게 페이드 아웃 후 seek
-            fadeVolume(0, 120, () => {
-                // readyState가 HAVE_METADATA(1) 이상이어야 currentTime을 안정적으로 설정 가능
-                if (audio.readyState >= 1) {
-                    doSeekAndPlay();
-                } else {
-                    // 메타데이터가 로드되지 않았다면 load() 호출 후 대기
-                    audio.load();
-                    const onLoadedMetadata = () => {
-                        audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-                        doSeekAndPlay();
-                    };
-                    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-                }
-            });
-        }
-
-        // 재생 중에 활성 문장을 업데이트하는 함수
-        let _currentActiveIndex = -1;
-        function updateActiveSentenceByTime(time) {
-            let foundActive = false;
-            let newActiveIndex = -1;
-
-            sentenceItems.forEach((item, idx) => {
-                const start = parseFloat(item.getAttribute('data-start')) || 0;
-                const end = parseFloat(item.getAttribute('data-end')) || 0;
-                const isActive = (time >= start && time < end);
-
-                if (isActive) {
-                    foundActive = true;
-                    newActiveIndex = idx;
-                    if (_currentActiveIndex !== idx) {
-                        _currentActiveIndex = idx;
-                    }
-                }
-            });
-
-            // 활성 문장이 없으면 마지막 활성 인덱스 유지
-            if (!foundActive && _currentActiveIndex !== -1) {
-                newActiveIndex = _currentActiveIndex;
-            }
-
-            // 하이라이트 적용
-            sentenceItems.forEach((item, idx) => {
-                if (idx === newActiveIndex) {
-                    item.classList.add('active');
-                } else {
-                    item.classList.remove('active');
-                }
-            });
-
-            // 문장이 변경되면 반복 재생 해제
-            if (isRepeating && foundActive && (_currentActiveIndex !== newActiveIndex)) {
-                isRepeating = false;
-                repeatBtn.classList.remove('active');
-            }
-        }
-
-        // 오디오 재생 중 시간 업데이트에 따라 활성 문장 하이라이트
-        audio.addEventListener('timeupdate', () => {
-            const t = audio.currentTime;
-            updateActiveSentenceByTime(t);
-            // 재생 중인 문장이 있으면 반복 버튼 활성화
-            repeatBtn.disabled = !document.querySelector('.sentence-item.active');
-        });
-
-        // 보관함에 추가 기능
-        let userCollections = [];
-
-        async function loadUserCollections() {
-            try {
-                const response = await fetch('{% url "get_user_collections" %}');
-                const data = await response.json();
-                userCollections = data.collections;
-
-                const select = document.getElementById('collectionSelect');
-                select.innerHTML = '<option value="">보관함 선택</option>';
-
-                userCollections.forEach(collection => {
-                    const option = document.createElement('option');
-                    option.value = collection.id;
-                    option.textContent = `${collection.name} (${collection.count}개)`;
-                    select.appendChild(option);
-                });
-
-                if (userCollections.length === 0) {
-                    select.innerHTML = '<option value="">보관함이 없습니다</option>';
-                }
-            } catch (error) {
-                console.error('보관함 로딩 오류:', error);
-            }
-        }
-
-        // 모달이 열릴 때 보관함 목록 로드
-        document.getElementById('addToCollectionModal').addEventListener('show.bs.modal', loadUserCollections);
-
-        // 보관함에 추가
-        document.getElementById('addToCollectionBtn').addEventListener('click', async function () {
-            const collectionId = document.getElementById('collectionSelect').value;
-
-            if (!collectionId) {
-                alert('보관함을 선택해주세요.');
-                return;
-            }
-
-            console.log('Adding audio {{ audio.id }} to collection', collectionId);
-
-            try {
-                const response = await fetch('{% url "add_to_collection" audio.id %}', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': '{{ csrf_token }}'
-                    },
-                    body: JSON.stringify({ collection_id: collectionId })
-                });
-
-                const data = await response.json();
-
-                console.log('Response:', response.status, data);
-
-                if (response.ok) {
-                    alert(data.message);
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('addToCollectionModal'));
-                    modal.hide();
-                } else {
-                    alert(data.error || '보관함에 추가하지 못했습니다.');
-                }
-            } catch (error) {
-                alert('오류가 발생했습니다: ' + error.message);
-                console.error('Error:', error);
-            }
-        });
-
-    }); // DOMContentLoaded 끝
+    // 💡 1. 모든 Django 템플릿 변수를 JavaScript 전역 CONFIG 객체에 저장합니다.
+    // 이는 외부 JS 파일이 Django 템플릿 변수를 안전하게 접근하도록 보장합니다.
+    window.AUDIO_DETAIL_CONFIG = {
+        CSRF_TOKEN: "{{ csrf_token }}",
+        UPDATE_URL: "{% url 'update_audio' audio.id %}",
+        DELETE_URL: "{% url 'delete_audio' audio.id %}",
+        AUDIO_LIST_URL: "{% url 'audio_list' %}",
+        GET_COLLECTIONS_URL: "{% url 'get_user_collections' %}",
+        ADD_TO_COLLECTION_URL: "{% url 'add_to_collection' audio.id %}",
+    };
 </script>
-
-<!-- 보관함에 추가 모달 -->
-<div class="modal fade" id="addToCollectionModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">보관함에 추가</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="collectionSelect" class="form-label">보관함 선택</label>
-                    <select class="form-select" id="collectionSelect">
-                        <option value="">로딩 중...</option>
-                    </select>
-                </div>
-                <div class="alert alert-info mb-0">
-                    <i class="fas fa-info-circle"></i>
-                    <a href="{% url 'collection_list' %}" target="_blank">보관함 관리 페이지</a>에서 새 보관함을 만들 수 있습니다.
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                <button type="button" class="btn btn-primary" id="addToCollectionBtn">추가</button>
-            </div>
-        </div>
-    </div>
-</div>
-
+<script src="{% static 'js/audio_detail.js' %}"></script>
 {% endblock %}

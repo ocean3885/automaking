@@ -10,6 +10,7 @@ from django.conf import settings
 from decouple import config
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from django.contrib.auth.decorators import login_required
+from django.db.models import Count
 
 # Google Cloud TTS 관련 모듈
 from google.cloud import texttospeech
@@ -618,9 +619,12 @@ def generate_sentences_view(request):
 # -----------------------------------------------------------
 
 @login_required
+@login_required
 def collection_list(request):
     """사용자의 보관함 목록을 보여줍니다."""
-    collections = Collection.objects.filter(user=request.user)
+    collections = Collection.objects.filter(user=request.user).annotate(
+        audio_count=Count('audio_contents')
+    )
     return render(request, 'core/collection_list.html', {'collections': collections})
 
 
@@ -647,11 +651,11 @@ def create_collection(request):
         description = data.get('description', '').strip()
         
         if not name:
-            return JsonResponse({'error': '보관함 이름을 입력해주세요.'}, status=400)
+            return JsonResponse({'success': False, 'message': '보관함 이름을 입력해주세요.'}, status=400)
 
         # 같은 이름의 보관함이 있는지 확인
         if Collection.objects.filter(user=request.user, name=name).exists():
-            return JsonResponse({'error': '같은 이름의 보관함이 이미 있습니다.'}, status=400)
+            return JsonResponse({'success': False, 'message': '같은 이름의 보관함이 이미 있습니다.'}, status=400)
 
         collection = Collection.objects.create(
             user=request.user,
@@ -660,12 +664,13 @@ def create_collection(request):
         )
         
         return JsonResponse({
+            'success': True,
             'id': collection.id,
             'name': collection.name,
             'description': collection.description
         })
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({'success': False, 'message': str(e)}, status=500)
 
 
 @login_required

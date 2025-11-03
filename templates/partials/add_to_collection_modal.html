@@ -1,0 +1,26 @@
+<div class="modal fade" id="addToCollectionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">보관함에 추가</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="collectionSelect" class="form-label">보관함 선택</label>
+                    <select class="form-select" id="collectionSelect">
+                        <option value="">로딩 중...</option>
+                    </select>
+                </div>
+                <div class="alert alert-info mb-0">
+                    <i class="fas fa-info-circle"></i>
+                    <a href="{% url 'collection_list' %}" target="_blank">보관함 관리 페이지</a>에서 새 보관함을 만들 수 있습니다.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-primary" id="addToCollectionBtn">추가</button>
+            </div>
+        </div>
+    </div>
+</div>

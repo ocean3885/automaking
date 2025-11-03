@@ -1,49 +1,77 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}내 보관함 - AutoMaking{% endblock %}
 
+{% block extra_css %}
+<style>
+    /* 보관함 카드 스타일 */
+    .collection-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+        height: 100%;
+    }
+    .collection-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    }
+    /* 인라인 편집 가능 영역 */
+    .collection-name, .collection-description {
+        cursor: text;
+    }
+    .collection-name:hover, .collection-description:hover {
+        background-color: #f8f9fa;
+    }
+    /* 편집 모드 시 시각적 표시 */
+    .edit-input {
+        border: 2px solid #007bff;
+        box-shadow: 0 0 5px rgba(0,123,255,0.5);
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container">
+<div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>📂 내 보관함</h1>
-        <div>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCollectionModal">
-                <i class="fas fa-plus"></i> 새 보관함 만들기
-            </button>
-            <a href="{% url 'audio_list' %}" class="btn btn-outline-secondary">음성 목록</a>
-        </div>
+        <h2><i class="fas fa-folder-open"></i> 내 보관함</h2>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createCollectionModal">
+            <i class="fas fa-plus"></i> 새 보관함 만들기
+        </button>
     </div>
 
     {% if collections %}
     <div class="row">
         {% for collection in collections %}
-        <div class="col-md-6 col-lg-4 mb-4">
-            <div class="card h-100">
+        <div class="col-md-4 mb-4">
+            <div class="card collection-card">
                 <div class="card-body">
-                    <h5 class="card-title">
-                        <i class="fas fa-folder"></i> {{ collection.name }}
+                    <h5 class="card-title collection-name" 
+                        contenteditable="false" 
+                        data-collection-id="{{ collection.id }}"
+                        data-original="{{ collection.name }}">
+                        {{ collection.name }}
                     </h5>
-                    {% if collection.description %}
-                    <p class="card-text text-muted">{{ collection.description }}</p>
-                    {% endif %}
-                    <p class="card-text">
-                        <small class="text-muted">
-                            <i class="fas fa-music"></i> {{ collection.audio_contents.count }}개 항목
-                        </small>
+                    <p class="card-text collection-description text-muted" 
+                        contenteditable="false"
+                        data-collection-id="{{ collection.id }}"
+                        data-original="{{ collection.description|default:'' }}">
+                        {{ collection.description|default:"설명 없음" }}
                     </p>
                     <p class="card-text">
                         <small class="text-muted">
-                            생성일: {{ collection.created_at|date:"Y년 m월 d일" }}
+                            <i class="fas fa-music"></i> {{ collection.audio_count }}개 음성
                         </small>
                     </p>
-                </div>
-                <div class="card-footer bg-transparent">
-                    <a href="{% url 'collection_detail' collection.id %}" class="btn btn-sm btn-outline-primary">
-                        <i class="fas fa-eye"></i> 보기
-                    </a>
-                    <button class="btn btn-sm btn-outline-danger delete-collection-btn" data-id="{{ collection.id }}" data-name="{{ collection.name }}">
-                        <i class="fas fa-trash"></i> 삭제
-                    </button>
+                    <div class="d-flex justify-content-between">
+                        <a href="{% url 'collection_detail' collection.id %}" class="btn btn-sm btn-outline-primary">
+                            <i class="fas fa-eye"></i> 보기
+                        </a>
+                        <button type="button" class="btn btn-sm btn-outline-danger delete-collection" 
+                                data-collection-id="{{ collection.id }}"
+                                data-collection-name="{{ collection.name }}">
+                            <i class="fas fa-trash"></i> 삭제
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -51,12 +79,11 @@
     </div>
     {% else %}
     <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i> 아직 보관함이 없습니다. 새 보관함을 만들어보세요!
+        <i class="fas fa-info-circle"></i> 아직 생성된 보관함이 없습니다. 새 보관함을 만들어보세요!
     </div>
     {% endif %}
 </div>
 
-<!-- 새 보관함 만들기 모달 -->
 <div class="modal fade" id="createCollectionModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -66,26 +93,26 @@
             </div>
             <div class="modal-body">
                 <form id="createCollectionForm">
+                    {% csrf_token %}
                     <div class="mb-3">
                         <label for="collectionName" class="form-label">보관함 이름 *</label>
-                        <input type="text" class="form-control" id="collectionName" required>
+                        <input type="text" class="form-control" id="collectionName" name="name" required>
                     </div>
                     <div class="mb-3">
-                        <label for="collectionDescription" class="form-label">설명 (선택)</label>
-                        <textarea class="form-control" id="collectionDescription" rows="3"></textarea>
+                        <label for="collectionDescription" class="form-label">설명</label>
+                        <textarea class="form-control" id="collectionDescription" name="description" rows="3"></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                <button type="button" class="btn btn-primary" id="saveCollectionBtn">생성</button>
+                <button type="button" class="btn btn-primary" id="createCollectionBtn">만들기</button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- 삭제 확인 모달 -->
-<div class="modal fade" id="deleteCollectionModal" tabindex="-1">
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
@@ -94,87 +121,248 @@
             </div>
             <div class="modal-body">
                 <p><strong id="deleteCollectionName"></strong> 보관함을 삭제하시겠습니까?</p>
-                <p class="text-muted small">보관함만 삭제되며, 포함된 오디오는 삭제되지 않습니다.</p>
+                <p class="text-muted">보관함만 삭제되며, 포함된 음성 파일은 삭제되지 않습니다.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">취소</button>
-                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">삭제</button>
+                <form id="deleteCollectionForm" method="POST" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">삭제</button>
+                </form>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Font Awesome CDN -->
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+{% endblock %}
 
+{% block extra_js %}
 <script>
-// 보관함 생성
-document.getElementById('saveCollectionBtn').addEventListener('click', async function() {
-    const name = document.getElementById('collectionName').value.trim();
-    const description = document.getElementById('collectionDescription').value.trim();
+document.addEventListener('DOMContentLoaded', function() {
+    // Bootstrap Modal 인스턴스 생성 (Bootstrap이 로드되었다는 가정 하에)
+    const createModalElement = document.getElementById('createCollectionModal');
+    const deleteModalElement = document.getElementById('deleteConfirmModal');
     
-    if (!name) {
-        alert('보관함 이름을 입력해주세요.');
-        return;
+    // Bootstrap이 로드되지 않았을 경우를 대비하여 조건부 생성
+    let createModal, deleteModal;
+    if (typeof bootstrap !== 'undefined') {
+        if (createModalElement) {
+            createModal = new bootstrap.Modal(createModalElement);
+        }
+        if (deleteModalElement) {
+            deleteModal = new bootstrap.Modal(deleteModalElement);
+        }
+    } else {
+        console.error('⚠️ Bootstrap JavaScript가 로드되지 않았습니다!');
     }
 
-    try {
-        const response = await fetch('{% url "create_collection" %}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': '{{ csrf_token }}'
-            },
-            body: JSON.stringify({ name, description })
+
+    // --- 1. 새 보관함 만들기 (Create Collection) 처리 ---
+    const createBtn = document.getElementById('createCollectionBtn');
+    const createForm = document.getElementById('createCollectionForm');
+
+    if (createBtn && createForm) {
+        createBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            const nameInput = document.getElementById('collectionName');
+            const descInput = document.getElementById('collectionDescription');
+            const name = nameInput.value.trim();
+            const description = descInput.value.trim();
+            
+            if (!name) {
+                alert('보관함 이름을 입력해주세요.');
+                return;
+            }
+            
+            const csrfToken = createForm.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            try {
+                const url = '{% url "create_collection" %}'; // Django URL 태그 사용
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ name, description })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    // 성공 시 페이지 새로고침 (새로 만든 보관함 표시)
+                    location.reload(); 
+                } else {
+                    alert(data.message || '보관함 생성에 실패했습니다.');
+                }
+            } catch (error) {
+                console.error('Fetch error:', error);
+                alert('보관함 생성 중 오류가 발생했습니다: ' + error.message);
+            }
+        });
+    }
+
+
+    // --- 2. 보관함 삭제 (Delete Collection) 처리 ---
+    const deleteButtons = document.querySelectorAll('.delete-collection');
+    const deleteForm = document.getElementById('deleteCollectionForm');
+    const deleteNameElement = document.getElementById('deleteCollectionName');
+
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.stopPropagation(); // 카드 자체 클릭 이벤트가 있다면 방지
+
+            const collectionId = this.dataset.collectionId;
+            const collectionName = this.dataset.collectionName;
+            
+            if (deleteNameElement) {
+                deleteNameElement.textContent = collectionName;
+            }
+            if (deleteForm) {
+                // Django URL을 JavaScript에서 동적으로 설정
+                deleteForm.action = `/collections/${collectionId}/delete/`; 
+            }
+            
+            if (deleteModal) {
+                deleteModal.show();
+            } else {
+                // Bootstrap 모달이 없을 때의 대체 동작
+                if (confirm(`"${collectionName}" 보관함을 삭제하시겠습니까?`)) {
+                    deleteForm.submit(); 
+                }
+            }
+        });
+    });
+
+    
+    // --- 3. 인라인 편집 (Inline Edit) 처리 ---
+    // 이름과 설명을 업데이트하는 공통 비동기 함수
+    async function updateCollection(collectionId, name, description, element) {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const data = {};
+        if (name !== null) data.name = name;
+        if (description !== null) data.description = description;
+
+        try {
+            const response = await fetch(`/collections/${collectionId}/update/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                // 성공 시 data-original 값 업데이트
+                if (name !== null) element.dataset.original = name;
+                if (description !== null) element.dataset.original = description;
+            } else {
+                alert(result.message || result.error || '업데이트에 실패했습니다.');
+                // 실패 시 원래 값으로 되돌리기
+                if (name !== null) {
+                    element.textContent = element.dataset.original;
+                } else {
+                    element.textContent = element.dataset.original || '설명 없음';
+                }
+            }
+        } catch (error) {
+            console.error('Update error:', error);
+            alert('업데이트 중 오류가 발생했습니다.');
+            // 오류 발생 시 원래 값으로 되돌리기
+            if (name !== null) {
+                element.textContent = element.dataset.original;
+            } else {
+                element.textContent = element.dataset.original || '설명 없음';
+            }
+        }
+    }
+
+    // 이름 인라인 편집 이벤트
+    document.querySelectorAll('.collection-name').forEach(element => {
+        element.addEventListener('click', function(e) {
+            e.stopPropagation();
+            this.contentEditable = 'true';
+            this.classList.add('edit-input');
+            this.focus();
+            
+            // 텍스트 전체를 선택 상태로 만듦
+            const range = document.createRange();
+            range.selectNodeContents(this);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
         });
 
-        const data = await response.json();
-        
-        if (response.ok) {
-            // 페이지 새로고침
-            window.location.reload();
-        } else {
-            alert(data.error || '보관함 생성에 실패했습니다.');
-        }
-    } catch (error) {
-        alert('오류가 발생했습니다.');
-        console.error(error);
-    }
-});
-
-// 보관함 삭제
-let deleteCollectionId = null;
-const deleteModal = new bootstrap.Modal(document.getElementById('deleteCollectionModal'));
-
-document.querySelectorAll('.delete-collection-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        deleteCollectionId = this.getAttribute('data-id');
-        const collectionName = this.getAttribute('data-name');
-        document.getElementById('deleteCollectionName').textContent = collectionName;
-        deleteModal.show();
-    });
-});
-
-document.getElementById('confirmDeleteBtn').addEventListener('click', async function() {
-    if (!deleteCollectionId) return;
-
-    try {
-        const response = await fetch(`/collections/${deleteCollectionId}/delete/`, {
-            method: 'POST',
-            headers: {
-                'X-CSRFToken': '{{ csrf_token }}'
+        // 편집 완료 (Blur 이벤트: 포커스를 잃었을 때)
+        element.addEventListener('blur', function() {
+            this.contentEditable = 'false';
+            this.classList.remove('edit-input');
+            
+            const collectionId = this.dataset.collectionId;
+            const newName = this.textContent.trim();
+            const originalName = this.dataset.original;
+            
+            if (newName && newName !== originalName) {
+                updateCollection(collectionId, newName, null, this);
+            } else {
+                // 내용이 없거나 변경되지 않았으면 원래대로 복구
+                this.textContent = originalName;
             }
         });
 
-        if (response.ok) {
-            window.location.reload();
-        } else {
-            alert('삭제에 실패했습니다.');
-        }
-    } catch (error) {
-        alert('오류가 발생했습니다.');
-        console.error(error);
-    }
+        // 엔터 키 입력 시 저장 및 포커스 해제
+        element.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.blur(); // blur 이벤트를 발생시켜 업데이트 함수 실행
+            } else if (e.key === 'Escape') {
+                this.textContent = this.dataset.original; // 원래 값으로 복구
+                this.blur();
+            }
+        });
+    });
+
+    // 설명 인라인 편집 이벤트 (이름과 거의 동일한 로직)
+    document.querySelectorAll('.collection-description').forEach(element => {
+        element.addEventListener('click', function(e) {
+            e.stopPropagation();
+            this.contentEditable = 'true';
+            this.classList.add('edit-input');
+            this.focus();
+            
+            const range = document.createRange();
+            range.selectNodeContents(this);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+        });
+
+        // 편집 완료 (Blur 이벤트)
+        element.addEventListener('blur', function() {
+            this.contentEditable = 'false';
+            this.classList.remove('edit-input');
+            
+            const collectionId = this.dataset.collectionId;
+            const newDescription = this.textContent.trim();
+            const originalDescription = this.dataset.original;
+            
+            if (newDescription !== originalDescription) {
+                updateCollection(collectionId, null, newDescription, this);
+            }
+        });
+
+        // ESC 키 입력 시 취소
+        element.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                this.textContent = this.dataset.original || '설명 없음';
+                this.blur();
+            }
+        });
+    });
 });
 </script>
 {% endblock %}

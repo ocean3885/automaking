@@ -18,6 +18,9 @@ DATABASES = {
 
 # Static files
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static_dev'),
+]
 
 STORAGE_ENVIRONMENT_PREFIX = 'local'
     
