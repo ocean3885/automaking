@@ -43,11 +43,17 @@ echo "[5/6] 데이터베이스 마이그레이션..."
 export DJANGO_SETTINGS_MODULE=automaking.settings.production
 python "$PROJECT_DIR/manage.py" migrate --settings=automaking.settings.production --noinput
 
-# 6. 정적 파일 수집
+# 6. Tailwind CSS 프로덕션 빌드 (새로 추가된 단계)
+echo "[6/7] Tailwind CSS 프로덕션 빌드 (CSS 최적화)..." # 단계 번호 수정
+# settings를 지정하지 않으면 DJANGO_SETTINGS_MODULE 변수를 따라갑니다.
+python "$PROJECT_DIR/manage.py" tailwind build
+echo "✅ Tailwind CSS 빌드 완료 (Purging 및 Minifying 포함)"
+
+# 7. 정적 파일 수집
 echo "[6/6] 정적 파일 수집..."
 python "$PROJECT_DIR/manage.py" collectstatic --settings=automaking.settings.production --noinput
 
-# 7. 서비스 재시작
+# 8. 서비스 재시작
 echo "[7/7] Gunicorn 재시작..."
 sudo systemctl restart gunicorn
 

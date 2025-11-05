@@ -95,8 +95,7 @@ def get_google_cloud_credentials():
 GOOGLE_CLOUD_CREDENTIALS_JSON = get_google_cloud_credentials()
 
 
-# Application definition
-INSTALLED_APPS = [
+BASE_INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -104,12 +103,24 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sites",
+]
+
+LOCAL_APPS = [] 
+
+THIRD_PARTY_APPS = [
+    "tailwind",
+    "theme",
+
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
+
     "core.apps.CoreConfig",
     'storages',
 ]
+
+INSTALLED_APPS = BASE_INSTALLED_APPS + LOCAL_APPS + THIRD_PARTY_APPS
+TAILWIND_APP_NAME = "theme"
 
 SITE_ID = 1
 

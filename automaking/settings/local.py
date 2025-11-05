@@ -7,6 +7,8 @@ from .base import *
 DEBUG = True
 
 ALLOWED_HOSTS = ['*']
+LOCAL_APPS += ["django_browser_reload"]
+MIDDLEWARE.insert(0, "django_browser_reload.middleware.BrowserReloadMiddleware")
 
 # Database
 DATABASES = {
